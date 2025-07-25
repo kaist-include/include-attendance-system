@@ -25,10 +25,13 @@ export default function LoginPage() {
     setError('');
 
     try {
+      console.log('Attempting to sign in with:', email);
       await signIn(email, password);
+      console.log('Sign in successful, redirecting to dashboard');
       router.push(ROUTES.dashboard);
-    } catch (err) {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+    } catch (err: any) {
+      console.error('Sign in error:', err);
+      setError(err.message || '이메일 또는 비밀번호가 올바르지 않습니다.');
     } finally {
       setIsLoading(false);
     }
