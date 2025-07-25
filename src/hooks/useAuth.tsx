@@ -4,7 +4,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase, getCurrentUser, signOut } from '@/lib/supabase';
 import { Profile, UserRole } from '@/types';
-import { getErrorMessage } from '@/utils';
+import { getErrorMessage } from '@/lib/utils';
 
 interface AuthContextType {
   user: User | null;

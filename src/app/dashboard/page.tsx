@@ -2,8 +2,8 @@
 
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 // Icons replaced with unicode symbols
 
 export default function DashboardPage() {

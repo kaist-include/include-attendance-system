@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 // Icons replaced with unicode symbols
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/config/constants';
 
 export default function RegisterPage() {
@@ -186,10 +186,9 @@ export default function RegisterPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                loading={isLoading}
-                disabled={!isFormValid}
+                disabled={!isFormValid || isLoading}
               >
-                회원가입
+                {isLoading ? '회원가입 중...' : '회원가입'}
               </Button>
             </form>
 

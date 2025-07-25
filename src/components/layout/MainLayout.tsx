@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 // Icons replaced with unicode symbols
-import { cn } from '@/utils';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/config/constants';
 

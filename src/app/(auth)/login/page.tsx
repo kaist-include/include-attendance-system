@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 // Icons replaced with unicode symbols
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/config/constants';
 
 export default function LoginPage() {
@@ -110,10 +110,9 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                loading={isLoading}
-                disabled={!email || !password}
+                disabled={!email || !password || isLoading}
               >
-                로그인
+                {isLoading ? '로그인 중...' : '로그인'}
               </Button>
             </form>
 

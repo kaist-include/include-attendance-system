@@ -5,8 +5,8 @@ import Link from 'next/link';
 // Icons replaced with unicode symbols
 import { useAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/config/constants';
 
 // 임시 데이터 (실제로는 API에서 가져올 데이터)
