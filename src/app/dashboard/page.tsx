@@ -4,7 +4,7 @@ import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-// Icons replaced with unicode symbols
+import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
@@ -23,7 +23,7 @@ export default function DashboardPage() {
       title: '참여 중인 세미나',
       value: '3',
       description: '이번 학기',
-      icon: '📚',
+      icon: BookOpen,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
@@ -31,7 +31,7 @@ export default function DashboardPage() {
       title: '평균 출석률',
       value: '92%',
       description: '지난 4주',
-      icon: '📈',
+      icon: TrendingUp,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
@@ -39,7 +39,7 @@ export default function DashboardPage() {
       title: '다음 세션',
       value: '2',
       description: '이번 주',
-      icon: '⏰',
+      icon: Clock,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
     },
@@ -47,7 +47,7 @@ export default function DashboardPage() {
       title: '완료한 세미나',
       value: '8',
       description: '전체 기간',
-      icon: '🏆',
+      icon: Award,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
     },
@@ -104,6 +104,7 @@ export default function DashboardPage() {
         {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => {
+            const Icon = stat.icon;
             return (
               <Card key={index} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -111,7 +112,7 @@ export default function DashboardPage() {
                     {stat.title}
                   </CardTitle>
                   <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                    <span className="text-xl">{stat.icon}</span>
+                    <Icon className={`w-4 h-4 ${stat.color}`} />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -128,7 +129,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <span className="text-blue-600">📅</span>
+                <Calendar className="w-5 h-5 text-blue-600" />
                 <span>다가오는 세션</span>
               </CardTitle>
               <CardDescription>
@@ -160,7 +161,7 @@ export default function DashboardPage() {
               
               {upcomingSessions.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <span className="block text-6xl mb-4 text-gray-300">📅</span>
+                  <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>다가오는 세션이 없습니다</p>
                 </div>
               )}
@@ -171,7 +172,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <span className="text-green-600">🔔</span>
+                <Bell className="w-5 h-5 text-green-600" />
                 <span>최근 공지사항</span>
               </CardTitle>
               <CardDescription>
@@ -203,7 +204,7 @@ export default function DashboardPage() {
               
               {recentAnnouncements.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <span className="block text-6xl mb-4 text-gray-300">🔔</span>
+                  <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>새로운 공지사항이 없습니다</p>
                 </div>
               )}
@@ -222,19 +223,19 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>📚</span>
+                <BookOpen className="w-5 h-5" />
                 <span>세미나 둘러보기</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>👥</span>
+                <Users className="w-5 h-5" />
                 <span>내 신청 현황</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>📈</span>
+                <TrendingUp className="w-5 h-5" />
                 <span>출석 현황</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>🔔</span>
+                <Bell className="w-5 h-5" />
                 <span>알림 설정</span>
               </Button>
             </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-// Icons replaced with unicode symbols
+import { Search, Filter, Calendar, Users, Clock, MapPin, Tag, GraduationCap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,7 +131,7 @@ export default function SeminarsPage() {
             <div className="space-y-4">
               {/* 검색바 */}
               <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="세미나 제목, 설명, 강사명으로 검색..."
@@ -145,7 +145,7 @@ export default function SeminarsPage() {
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 {/* 상태 필터 */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-500">🔽</span>
+                  <Filter className="w-4 h-4 text-gray-500" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
@@ -200,19 +200,19 @@ export default function SeminarsPage() {
                 {/* 기본 정보 */}
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">👨‍🏫</span>
+                    <GraduationCap className="w-4 h-4 mr-2" />
                     <span>강사: {seminar.instructor}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">📅</span>
+                    <Calendar className="w-4 h-4 mr-2" />
                     <span>{seminar.startDate} ~ {seminar.endDate}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">📍</span>
+                    <MapPin className="w-4 h-4 mr-2" />
                     <span>{seminar.location}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">⏰</span>
+                    <Clock className="w-4 h-4 mr-2" />
                     <span>총 {seminar.sessions}회차</span>
                   </div>
                 </div>
@@ -244,7 +244,7 @@ export default function SeminarsPage() {
                       key={tag}
                       className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
                     >
-                      <span className="mr-1">🏷️</span>
+                      <Tag className="w-3 h-3 mr-1" />
                       {tag}
                     </span>
                   ))}
@@ -278,7 +278,7 @@ export default function SeminarsPage() {
           <Card>
             <CardContent className="py-12">
               <div className="text-center">
-                <span className="block text-6xl mb-4 text-gray-300">🔍</span>
+                <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   검색 결과가 없습니다
                 </h3>
