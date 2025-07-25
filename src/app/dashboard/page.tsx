@@ -1,13 +1,96 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-// Icons replaced with unicode symbols
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+interface UpcomingSession {
+  id: string;
+  title: string;
+  session: string;
+  sessionTitle: string;
+  date: string;
+  time: string;
+  location: string;
+  description?: string;
+}
 
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
+  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+
+
+
+  // Fetch upcoming sessions
+  useEffect(() => {
+    let cancelled = false;
+    
+    const fetchUpcomingSessions = async () => {
+      if (!user?.id || cancelled) {
+        if (!cancelled) setSessionsLoading(false);
+        return;
+      }
+      
+      try {
+        setSessionsLoading(true);
+        
+        // Get user session for authorization
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Error getting session:', sessionError);
+          if (!cancelled) setSessionsLoading(false);
+          return;
+        }
+        
+        const session = sessionData?.session;
+        if (!session?.access_token || cancelled) {
+          if (!cancelled) setSessionsLoading(false);
+          return;
+        }
+
+        const response = await fetch('/api/sessions/upcoming', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (cancelled) return;
+
+        if (response.ok) {
+          const data = await response.json();
+          if (!cancelled) {
+            setUpcomingSessions(data);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('Failed to fetch upcoming sessions:', response.status, errorText);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error fetching upcoming sessions:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setSessionsLoading(false);
+        }
+      }
+    };
+
+    fetchUpcomingSessions();
+
+    // Cleanup function to cancel the request if component unmounts or effect re-runs
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]); // Use user.id instead of user object to reduce re-renders
 
   if (loading || !user) {
     return (
@@ -17,58 +100,39 @@ export default function DashboardPage() {
     );
   }
 
-  // 임시 데이터 (실제로는 API에서 가져올 데이터)
+  // 임시 데이터 (실제로는 API에서 가져올 데이터) - TODO: 실제 통계 API 구현
   const stats = [
     {
       title: '참여 중인 세미나',
-      value: '3',
+      value: '0', // TODO: 실제 데이터로 교체
       description: '이번 학기',
-      icon: '📚',
+      icon: BookOpen,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
       title: '평균 출석률',
-      value: '92%',
+      value: '-%', // TODO: 실제 데이터로 교체
       description: '지난 4주',
-      icon: '📈',
+      icon: TrendingUp,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
     {
       title: '다음 세션',
-      value: '2',
+      value: upcomingSessions.length.toString(),
       description: '이번 주',
-      icon: '⏰',
+      icon: Clock,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
     },
     {
       title: '완료한 세미나',
-      value: '8',
+      value: '0', // TODO: 실제 데이터로 교체
       description: '전체 기간',
-      icon: '🏆',
+      icon: Award,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
-    },
-  ];
-
-  const upcomingSessions = [
-    {
-      id: 1,
-      title: 'React 심화 세미나',
-      session: '5회차',
-      date: '2025년 1월 30일',
-      time: '19:00',
-      location: '온라인 (Zoom)',
-    },
-    {
-      id: 2,
-      title: 'AI/ML 기초 스터디',
-      session: '3회차',
-      date: '2025년 2월 1일',
-      time: '14:00',
-      location: 'N1 세미나실',
     },
   ];
 
@@ -104,6 +168,7 @@ export default function DashboardPage() {
         {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => {
+            const Icon = stat.icon;
             return (
               <Card key={index} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -111,7 +176,7 @@ export default function DashboardPage() {
                     {stat.title}
                   </CardTitle>
                   <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                    <span className="text-xl">{stat.icon}</span>
+                    <Icon className={`w-4 h-4 ${stat.color}`} />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -128,41 +193,52 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <span className="text-blue-600">📅</span>
+                <Calendar className="w-5 h-5 text-blue-600" />
                 <span>다가오는 세션</span>
               </CardTitle>
               <CardDescription>
-                이번 주 참여 예정인 세미나 세션입니다
+                이번 주(~{new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}) 참여 예정인 세미나 세션입니다
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {upcomingSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{session.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{session.session}</p>
-                      <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                        <span>{session.date}</span>
-                        <span>{session.time}</span>
-                        <span>{session.location}</span>
+              {sessionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600">세션을 불러오는 중...</span>
+                </div>
+              ) : (
+                <>
+                  {upcomingSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">{session.title}</h3>
+                          <p className="text-sm text-gray-600 mt-1">{session.session}</p>
+                          <p className="text-sm text-gray-700 mt-1 font-medium">{session.sessionTitle}</p>
+                          <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                            <span>{session.date}</span>
+                            <span>{session.time}</span>
+                            <span>{session.location}</span>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          상세보기
+                        </Button>
                       </div>
                     </div>
-                    <Button size="sm" variant="outline">
-                      상세보기
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              
-              {upcomingSessions.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <span className="block text-6xl mb-4 text-gray-300">📅</span>
-                  <p>다가오는 세션이 없습니다</p>
-                </div>
+                  ))}
+                  
+                  {upcomingSessions.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>다가오는 세션이 없습니다</p>
+                      <p className="text-sm mt-1">세미나에 신청하여 세션에 참여해보세요</p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -171,7 +247,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <span className="text-green-600">🔔</span>
+                <Bell className="w-5 h-5 text-green-600" />
                 <span>최근 공지사항</span>
               </CardTitle>
               <CardDescription>
@@ -203,7 +279,7 @@ export default function DashboardPage() {
               
               {recentAnnouncements.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <span className="block text-6xl mb-4 text-gray-300">🔔</span>
+                  <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>새로운 공지사항이 없습니다</p>
                 </div>
               )}
@@ -222,19 +298,19 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>📚</span>
+                <BookOpen className="w-5 h-5" />
                 <span>세미나 둘러보기</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>👥</span>
+                <Users className="w-5 h-5" />
                 <span>내 신청 현황</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>📈</span>
+                <TrendingUp className="w-5 h-5" />
                 <span>출석 현황</span>
               </Button>
               <Button variant="outline" className="h-16 flex-col space-y-2">
-                <span>🔔</span>
+                <Bell className="w-5 h-5" />
                 <span>알림 설정</span>
               </Button>
             </div>

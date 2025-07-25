@@ -3,30 +3,30 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// Icons replaced with unicode symbols
+import { Calendar, Users, BarChart3, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/config/constants';
 
 const features = [
   {
-    icon: '📅',
+    icon: Calendar,
     title: '세미나 관리',
     description: '세미나 생성, 일정 관리, 회차별 내용 구성이 간편합니다.',
   },
   {
-    icon: '👥',
+    icon: Users,
     title: '참여자 관리',
     description: '신청자 승인, 정원 관리, 참여자 현황을 한눈에 확인하세요.',
   },
   {
-    icon: '📊',
+    icon: BarChart3,
     title: '출석 통계',
     description: 'QR 코드 출석, 출석률 분석, 개인별 참여 현황을 제공합니다.',
   },
   {
-    icon: '🛡️',
+    icon: Shield,
     title: '권한 관리',
     description: '관리자, 세미나장, 일반회원 역할에 따른 체계적 권한 관리.',
   },
@@ -114,11 +114,12 @@ export default function Home() {
         
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => {
+            const Icon = feature.icon;
             return (
               <Card key={index} className="text-center border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <span className="text-2xl">{feature.icon}</span>
+                    <Icon className="w-6 h-6 text-blue-600" />
                   </div>
                   <CardTitle className="text-xl">{feature.title}</CardTitle>
                 </CardHeader>

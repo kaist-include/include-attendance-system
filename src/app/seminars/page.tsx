@@ -1,75 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-// Icons replaced with unicode symbols
+import { Search, Filter, Calendar, Users, Clock, MapPin, Tag, GraduationCap, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/config/constants';
+import { supabase } from '@/lib/supabase';
 
-// 임시 데이터 (실제로는 API에서 가져올 데이터)
-const seminars = [
-  {
-    id: 1,
-    title: 'React 심화 세미나',
-    description: 'React의 고급 패턴과 성능 최적화 기법을 학습합니다. Hooks, Context API, 메모이제이션 등을 다룹니다.',
-    instructor: '김개발',
-    startDate: '2025-01-15',
-    endDate: '2025-03-15',
-    capacity: 20,
-    enrolled: 18,
-    location: '온라인 (Zoom)',
-    tags: ['React', 'Frontend', '심화'],
-    status: 'recruiting' as const,
-    sessions: 8,
-  },
-  {
-    id: 2,
-    title: 'AI/ML 기초 스터디',
-    description: '머신러닝과 딥러닝의 기초 개념부터 실습까지 체계적으로 학습합니다.',
-    instructor: '박머신',
-    startDate: '2025-02-01',
-    endDate: '2025-04-30',
-    capacity: 15,
-    enrolled: 12,
-    location: 'N1 세미나실',
-    tags: ['AI', 'Machine Learning', '기초'],
-    status: 'recruiting' as const,
-    sessions: 12,
-  },
-  {
-    id: 3,
-    title: '백엔드 아키텍처 세미나',
-    description: '확장 가능한 백엔드 시스템 설계와 마이크로서비스 아키텍처를 학습합니다.',
-    instructor: '최백엔드',
-    startDate: '2025-01-20',
-    endDate: '2025-03-20',
-    capacity: 25,
-    enrolled: 25,
-    location: 'N2 세미나실',
-    tags: ['Backend', 'Architecture', '심화'],
-    status: 'in_progress' as const,
-    sessions: 10,
-  },
-  {
-    id: 4,
-    title: 'UI/UX 디자인 기초',
-    description: '사용자 경험 설계와 인터페이스 디자인 원칙을 배우고 실습합니다.',
-    instructor: '정디자인',
-    startDate: '2025-03-01',
-    endDate: '2025-05-01',
-    capacity: 20,
-    enrolled: 5,
-    location: '온라인 (Discord)',
-    tags: ['Design', 'UI', 'UX', '기초'],
-    status: 'recruiting' as const,
-    sessions: 8,
-  },
-];
+interface Seminar {
+  id: string;
+  title: string;
+  description: string;
+  instructor: string;
+  startDate: string;
+  endDate: string | null;
+  capacity: number;
+  enrolled: number;
+  location: string | null;
+  tags: string[];
+  status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
+  sessions: number;
+}
 
 const statusLabels = {
+  draft: { label: '준비중', color: 'bg-gray-100 text-gray-800' },
   recruiting: { label: '모집중', color: 'bg-green-100 text-green-800' },
   in_progress: { label: '진행중', color: 'bg-blue-100 text-blue-800' },
   completed: { label: '완료', color: 'bg-gray-100 text-gray-800' },
@@ -78,26 +35,69 @@ const statusLabels = {
 
 export default function SeminarsPage() {
   const { user } = useAuth();
+  const [seminars, setSeminars] = useState<Seminar[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Fetch seminars from API
+  useEffect(() => {
+    const fetchSeminars = async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams();
+        
+        if (statusFilter !== 'all') {
+          params.append('status', statusFilter);
+        }
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        if (selectedTags.length > 0) {
+          params.append('tags', selectedTags.join(','));
+        }
+
+        // Get session for authentication (optional - seminars should work without auth too)
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+        
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        
+        // Add auth header if user is logged in
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        
+        const response = await fetch(`/api/seminars?${params.toString()}`, {
+          method: 'GET',
+          headers,
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setSeminars(data);
+        } else {
+          const errorText = await response.text();
+          console.error('Failed to fetch seminars:', response.status, errorText);
+        }
+      } catch (error) {
+        console.error('Error fetching seminars:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSeminars();
+  }, [statusFilter, searchTerm, selectedTags]);
+
   // 모든 태그 수집
   const allTags = Array.from(new Set(seminars.flatMap(seminar => seminar.tags)));
 
-  // 필터링된 세미나
-  const filteredSeminars = seminars.filter(seminar => {
-    const matchesSearch = seminar.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         seminar.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         seminar.instructor.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesTags = selectedTags.length === 0 || 
-                       selectedTags.some(tag => seminar.tags.includes(tag));
-    
-    const matchesStatus = statusFilter === 'all' || seminar.status === statusFilter;
-
-    return matchesSearch && matchesTags && matchesStatus;
-  });
+  // Client-side filtering is now done by the API, but we keep this for immediate UI feedback
+  const filteredSeminars = seminars;
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => 
@@ -131,7 +131,7 @@ export default function SeminarsPage() {
             <div className="space-y-4">
               {/* 검색바 */}
               <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="세미나 제목, 설명, 강사명으로 검색..."
@@ -145,16 +145,18 @@ export default function SeminarsPage() {
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 {/* 상태 필터 */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-500">🔽</span>
+                  <Filter className="w-4 h-4 text-gray-500" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   >
                     <option value="all">모든 상태</option>
+                    <option value="draft">준비중</option>
                     <option value="recruiting">모집중</option>
                     <option value="in_progress">진행중</option>
                     <option value="completed">완료</option>
+                    <option value="cancelled">취소</option>
                   </select>
                 </div>
 
@@ -180,8 +182,14 @@ export default function SeminarsPage() {
         </Card>
 
         {/* 세미나 목록 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredSeminars.map((seminar) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-gray-600">세미나를 불러오는 중...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredSeminars.map((seminar) => (
             <Card key={seminar.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -200,19 +208,22 @@ export default function SeminarsPage() {
                 {/* 기본 정보 */}
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">👨‍🏫</span>
+                    <GraduationCap className="w-4 h-4 mr-2" />
                     <span>강사: {seminar.instructor}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">📅</span>
-                    <span>{seminar.startDate} ~ {seminar.endDate}</span>
+                    <Calendar className="w-4 h-4 mr-2" />
+                    <span>
+                      {new Date(seminar.startDate).toLocaleDateString('ko-KR')} ~ {' '}
+                      {seminar.endDate ? new Date(seminar.endDate).toLocaleDateString('ko-KR') : '진행중'}
+                    </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">📍</span>
-                    <span>{seminar.location}</span>
+                    <MapPin className="w-4 h-4 mr-2" />
+                    <span>{seminar.location || '장소 미정'}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
-                    <span className="mr-2">⏰</span>
+                    <Clock className="w-4 h-4 mr-2" />
                     <span>총 {seminar.sessions}회차</span>
                   </div>
                 </div>
@@ -244,7 +255,7 @@ export default function SeminarsPage() {
                       key={tag}
                       className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
                     >
-                      <span className="mr-1">🏷️</span>
+                      <Tag className="w-3 h-3 mr-1" />
                       {tag}
                     </span>
                   ))}
@@ -270,20 +281,21 @@ export default function SeminarsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* 검색 결과 없음 */}
-        {filteredSeminars.length === 0 && (
+        {!loading && seminars.length === 0 && (
           <Card>
             <CardContent className="py-12">
               <div className="text-center">
-                <span className="block text-6xl mb-4 text-gray-300">🔍</span>
+                <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  검색 결과가 없습니다
+                  세미나가 없습니다
                 </h3>
                 <p className="text-gray-600">
-                  다른 검색어나 필터를 시도해보세요
+                  아직 등록된 세미나가 없거나 검색 조건에 맞는 세미나가 없습니다
                 </p>
                 <Button 
                   variant="outline" 

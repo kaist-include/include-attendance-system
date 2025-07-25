@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// Icons replaced with unicode symbols
+import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/config/constants';
 
 export default function RegisterPage() {
@@ -97,7 +97,7 @@ export default function RegisterPage() {
                   이름
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">👤</span>
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     id="name"
                     name="name"
@@ -116,7 +116,7 @@ export default function RegisterPage() {
                   이메일
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">📧</span>
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     id="email"
                     name="email"
@@ -135,7 +135,7 @@ export default function RegisterPage() {
                   비밀번호
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔒</span>
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     id="password"
                     name="password"
@@ -151,7 +151,7 @@ export default function RegisterPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    <span>{showPassword ? '🙈' : '👁️'}</span>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -161,7 +161,7 @@ export default function RegisterPage() {
                   비밀번호 확인
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔒</span>
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
@@ -177,7 +177,7 @@ export default function RegisterPage() {
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    <span>{showConfirmPassword ? '🙈' : '👁️'}</span>
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -186,10 +186,9 @@ export default function RegisterPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                loading={isLoading}
-                disabled={!isFormValid}
+                disabled={!isFormValid || isLoading}
               >
-                회원가입
+                {isLoading ? '회원가입 중...' : '회원가입'}
               </Button>
             </form>
 
