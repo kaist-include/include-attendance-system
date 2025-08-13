@@ -41,7 +41,10 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
             <img src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
-            <span className="text-2xl font-bold text-foreground">Include</span>
+            <div className="leading-tight">
+              <span className="text-2xl font-bold text-foreground">Attendtion</span>
+              <div className="text-sm font-normal opacity-70">by include</div>
+            </div>
           </Link>
           <p className="text-muted-foreground mt-2">출석 관리 시스템에 로그인하세요</p>
         </div>
