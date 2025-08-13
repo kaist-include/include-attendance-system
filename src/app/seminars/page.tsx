@@ -158,9 +158,9 @@ export default function SeminarsPage() {
             </p>
           </div>
           {user && (
-            <Button className="mt-4 md:mt-0">
-              세미나 개설하기
-            </Button>
+            <Link href={ROUTES.createSeminar}>
+              <Button className="mt-4 md:mt-0">세미나 개설하기</Button>
+            </Link>
           )}
         </div>
 
