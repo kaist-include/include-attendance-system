@@ -38,17 +38,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">I</span>
+            <img src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
+            <div className="leading-tight">
+              <span className="text-2xl font-bold text-foreground">Attendtion</span>
+              <div className="text-sm font-normal opacity-70">by include</div>
             </div>
-            <span className="text-2xl font-bold text-gray-900">Include</span>
           </Link>
-          <p className="text-gray-600 mt-2">출석 관리 시스템에 로그인하세요</p>
+          <p className="text-muted-foreground mt-2">출석 관리 시스템에 로그인하세요</p>
         </div>
 
         <Card className="shadow-lg">
@@ -61,13 +62,13 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg text-sm">
                   {error}
                 </div>
               )}
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                <label htmlFor="email" className="text-sm font-medium text-foreground">
                   이메일
                 </label>
                 <div className="relative">
@@ -77,7 +78,7 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                    className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                     placeholder="이메일을 입력하세요"
                     required
                   />
@@ -85,7 +86,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                <label htmlFor="password" className="text-sm font-medium text-foreground">
                   비밀번호
                 </label>
                 <div className="relative">
@@ -95,14 +96,14 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                    className="pl-10 pr-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                     placeholder="비밀번호를 입력하세요"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -120,11 +121,11 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 계정이 없으신가요?{' '}
                 <Link
                   href={ROUTES.register}
-                  className="text-blue-600 hover:text-blue-500 font-medium"
+                  className="text-primary hover:opacity-90 font-medium"
                 >
                   회원가입
                 </Link>
@@ -136,7 +137,7 @@ export default function LoginPage() {
         <div className="mt-8 text-center">
           <Link
             href={ROUTES.home}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             ← 홈으로 돌아가기
           </Link>

@@ -95,7 +95,7 @@ export default function DashboardPage() {
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -106,33 +106,57 @@ export default function DashboardPage() {
       title: '참여 중인 세미나',
       value: '0', // TODO: 실제 데이터로 교체
       description: '이번 학기',
+<<<<<<< HEAD
+      icon: '📚',
+      color: 'text-primary',
+      bgColor: 'bg-secondary',
+=======
       icon: BookOpen,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
+>>>>>>> origin/master
     },
     {
       title: '평균 출석률',
       value: '-%', // TODO: 실제 데이터로 교체
       description: '지난 4주',
+<<<<<<< HEAD
+      icon: '📈',
+      color: 'text-foreground',
+      bgColor: 'bg-secondary',
+=======
       icon: TrendingUp,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
+>>>>>>> origin/master
     },
     {
       title: '다음 세션',
       value: upcomingSessions.length.toString(),
       description: '이번 주',
+<<<<<<< HEAD
+      icon: '⏰',
+      color: 'text-foreground',
+      bgColor: 'bg-secondary',
+=======
       icon: Clock,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
+>>>>>>> origin/master
     },
     {
       title: '완료한 세미나',
       value: '0', // TODO: 실제 데이터로 교체
       description: '전체 기간',
+<<<<<<< HEAD
+      icon: '🏆',
+      color: 'text-foreground',
+      bgColor: 'bg-secondary',
+=======
       icon: Award,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
+>>>>>>> origin/master
     },
   ];
 
@@ -158,8 +182,8 @@ export default function DashboardPage() {
       <div className="space-y-8">
         {/* 헤더 */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">대시보드</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold text-foreground">대시보드</h1>
+          <p className="text-muted-foreground mt-2">
             안녕하세요, <span className="font-medium">{user.email}</span>님!
             오늘도 활발한 학습 활동을 시작해보세요.
           </p>
@@ -172,7 +196,7 @@ export default function DashboardPage() {
             return (
               <Card key={index} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
                     {stat.title}
                   </CardTitle>
                   <div className={`p-2 rounded-lg ${stat.bgColor}`}>
@@ -180,8 +204,8 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                  <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
+                  <div className="text-2xl font-bold text-foreground">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
                 </CardContent>
               </Card>
             );
@@ -193,7 +217,11 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
+<<<<<<< HEAD
+                <span className="text-primary">📅</span>
+=======
                 <Calendar className="w-5 h-5 text-blue-600" />
+>>>>>>> origin/master
                 <span>다가오는 세션</span>
               </CardTitle>
               <CardDescription>
@@ -201,6 +229,35 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+<<<<<<< HEAD
+              {upcomingSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="border border-border rounded-lg p-4 hover:bg-accent transition-colors"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-foreground">{session.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{session.session}</p>
+                      <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
+                        <span>{session.date}</span>
+                        <span>{session.time}</span>
+                        <span>{session.location}</span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      상세보기
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              
+              {upcomingSessions.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <span className="block text-6xl mb-4 opacity-30">📅</span>
+                  <p>다가오는 세션이 없습니다</p>
+                </div>
+=======
               {sessionsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -239,6 +296,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </>
+>>>>>>> origin/master
               )}
             </CardContent>
           </Card>
@@ -247,7 +305,11 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
+<<<<<<< HEAD
+                <span className="text-foreground">🔔</span>
+=======
                 <Bell className="w-5 h-5 text-green-600" />
+>>>>>>> origin/master
                 <span>최근 공지사항</span>
               </CardTitle>
               <CardDescription>
@@ -258,28 +320,33 @@ export default function DashboardPage() {
               {recentAnnouncements.map((announcement) => (
                 <div
                   key={announcement.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-lg p-4 hover:bg-accent transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <h3 className="font-medium text-gray-900">{announcement.title}</h3>
+                        <h3 className="font-medium text-foreground">{announcement.title}</h3>
                         {announcement.isNew && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-foreground">
                             NEW
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">{announcement.content}</p>
-                      <p className="text-xs text-gray-500 mt-2">{announcement.time}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{announcement.time}</p>
                     </div>
                   </div>
                 </div>
               ))}
               
               {recentAnnouncements.length === 0 && (
+<<<<<<< HEAD
+                <div className="text-center py-8 text-muted-foreground">
+                  <span className="block text-6xl mb-4 opacity-30">🔔</span>
+=======
                 <div className="text-center py-8 text-gray-500">
                   <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+>>>>>>> origin/master
                   <p>새로운 공지사항이 없습니다</p>
                 </div>
               )}
