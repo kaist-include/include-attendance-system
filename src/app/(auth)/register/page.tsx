@@ -7,6 +7,7 @@ import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 
 export default function RegisterPage() {

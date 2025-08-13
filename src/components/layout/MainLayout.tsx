@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 
 interface MainLayoutProps {
@@ -200,7 +201,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 href={ROUTES.profile}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-accent"
               >
-<<<<<<< HEAD
                 <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                   <User className="w-4 h-4 text-muted-foreground" />
                 </div>

@@ -7,6 +7,7 @@ import { Calendar, Users, BarChart3, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 
 const features = [
