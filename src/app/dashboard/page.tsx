@@ -21,8 +21,15 @@ interface UpcomingSession {
 
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
+  const { profile } = useAuth();
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [weekRangeLabel, setWeekRangeLabel] = useState<string>("");
+
+  useEffect(() => {
+    const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    setWeekRangeLabel(end.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }));
+  }, []);
 
 
 
@@ -160,7 +167,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">대시보드</h1>
           <p className="text-muted-foreground mt-2">
-            안녕하세요, <span className="font-medium">{user.email}</span>님!
+            안녕하세요, <span className="font-medium" suppressHydrationWarning>{profile?.nickname || user.email}</span>님!
             오늘도 활발한 학습 활동을 시작해보세요.
           </p>
         </div>
@@ -197,7 +204,7 @@ export default function DashboardPage() {
                 <span>다가오는 세션</span>
               </CardTitle>
               <CardDescription>
-                이번 주(~{new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}) 참여 예정인 세미나 세션입니다
+                이번 주(~<span suppressHydrationWarning>{weekRangeLabel}</span>) 참여 예정인 세미나 세션입니다
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

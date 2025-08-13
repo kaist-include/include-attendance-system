@@ -59,3 +59,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Improve visibility of native date/time picker icons in dark mode */
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}

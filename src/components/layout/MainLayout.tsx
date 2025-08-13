@@ -145,7 +145,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           
           <div className="space-y-1">
             <Link
-              href={ROUTES.profile}
+              href={ROUTES.settings}
               className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => setSidebarOpen(false)}
             >

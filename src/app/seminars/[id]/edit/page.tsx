@@ -1,32 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
+import { useAuth, useRequireRole } from '@/hooks/useAuth';
 
-export default function CreateSeminarPage() {
-  const { user } = useRequireAuth();
+export default function EditSeminarPage() {
+  useRequireRole('seminar_leader');
   const { isAdmin, isSeminarLeader } = useAuth();
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   const [form, setForm] = useState({
-    title: '',
-    description: '',
+    title: '세미나 제목',
+    description: '세미나 설명',
     capacity: DEFAULTS.seminarCapacity,
     semester: '2025-1',
-    start_date: '',
-    end_date: '',
-    application_start: '',
-    application_end: '',
-    location: '',
+    start_date: '2025-01-15',
+    end_date: '2025-03-15',
+    application_start: '2024-12-20',
+    application_end: '2025-01-20',
+    location: 'KAIST',
     application_type: 'first_come' as const,
-    tags: [] as string[],
+    tags: ['기초'] as string[],
     tagInput: '',
   });
 
-  // Role protection is handled by useRequireRole; no need to locally disable the button
+  const canEdit = isAdmin || isSeminarLeader;
 
   const addTag = () => {
     const t = form.tagInput.trim();
@@ -42,28 +46,24 @@ export default function CreateSeminarPage() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.description || !form.start_date || !form.application_start) return;
-    if (!(isAdmin || isSeminarLeader)) {
-      alert('세미나를 개설할 권한이 없습니다. 관리자 또는 세미나 리더에게 문의하세요.');
-      return;
-    }
-    // Here we would call API to create the seminar
-    alert('세미나가 생성되었습니다 (Mock)');
-    window.location.href = ROUTES.seminars;
+    if (!canEdit) return;
+    // Here we would call API to update the seminar
+    alert('세미나가 수정되었습니다 (Mock)');
+    router.push(ROUTES.seminarDetail(id || ''));
   };
 
   return (
     <MainLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">세미나 개설</h1>
-          <p className="text-muted-foreground mt-2">제목, 설명, 정원, 일정, 태그 등을 설정하세요.</p>
+          <h1 className="text-3xl font-bold text-foreground">세미나 수정</h1>
+          <p className="text-muted-foreground mt-2">세미나 정보를 변경합니다.</p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>세미나 정보</CardTitle>
-            <CardDescription>필수 정보를 입력하세요</CardDescription>
+            <CardDescription>필수 정보를 수정하세요</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-6" onSubmit={onSubmit}>
@@ -75,7 +75,6 @@ export default function CreateSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                     maxLength={VALIDATION_RULES.seminar.titleMaxLength}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="세미나 제목"
                     required
                   />
                 </div>
@@ -98,7 +97,6 @@ export default function CreateSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     maxLength={VALIDATION_RULES.seminar.descriptionMaxLength}
                     className="mt-1 w-full min-h-32 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="세미나에 대한 설명을 입력하세요"
                     required
                   />
                 </div>
@@ -164,7 +162,6 @@ export default function CreateSeminarPage() {
                     value={form.location}
                     onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="온라인, 오프라인 등"
                   />
                 </div>
               </div>
@@ -211,16 +208,12 @@ export default function CreateSeminarPage() {
                     />
                     <Button type="button" variant="outline" onClick={addTag}>추가</Button>
                   </div>
-                  <div className="mt-2 flex gap-2 flex-wrap">
-                    {['기초', '백엔드', '프론트엔드', 'AI'].map(ct => (
-                      <button key={ct} type="button" onClick={() => setForm(f => ({ ...f, tagInput: ct }))} className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs">#{ct}</button>
-                    ))}
-                  </div>
                 </div>
               </div>
 
-              <div className="pt-2">
-                <Button type="submit">세미나 생성</Button>
+              <div className="pt-2 flex gap-2">
+                <Button type="submit" disabled={!canEdit}>저장</Button>
+                <Button type="button" variant="outline" onClick={() => router.push(ROUTES.seminarDetail(id || ''))}>취소</Button>
               </div>
             </form>
           </CardContent>
