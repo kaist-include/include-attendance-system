@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 
 interface MainLayoutProps {
@@ -83,9 +84,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <Link href={ROUTES.home} className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">I</span>
-            </div>
+            <IncludeLogo size="sm" />
             <span className="text-xl font-semibold text-gray-900">Include</span>
           </Link>
           <button

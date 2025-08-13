@@ -7,6 +7,7 @@ import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 
 export default function RegisterPage() {
@@ -69,9 +70,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">I</span>
-            </div>
+            <IncludeLogo size="lg" />
             <span className="text-2xl font-bold text-gray-900">Include</span>
           </Link>
           <p className="text-gray-600 mt-2">새 계정을 만들어 시작하세요</p>
