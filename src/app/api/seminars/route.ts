@@ -39,8 +39,9 @@ export async function GET(request: NextRequest) {
       .from('seminars')
       .select(`
         *,
-        users!seminars_owner_id_fkey (
-          name
+        users!owner_id (
+          name,
+          email
         ),
         semesters (
           name,
@@ -81,24 +82,103 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch seminars' }, { status: 500 });
     }
 
+    console.log('📊 Raw seminars data (first 2 items):', seminars?.slice(0, 2).map(s => ({
+      id: s.id,
+      title: s.title,
+      owner_id: s.owner_id,
+      users: s.users,
+      semesters: s.semesters
+    })));
+
+    // Use service client to fetch both users and enrollments data (public info)
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Fetch users data
+    const seminarOwnerIds = seminars?.map(s => s.owner_id).filter(Boolean) || [];
+    let userMap: Record<string, any> = {};
+    
+    if (seminarOwnerIds.length > 0) {
+      const { data: users, error: usersError } = await serviceSupabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', seminarOwnerIds);
+      
+      if (!usersError && users) {
+        userMap = users.reduce((acc: Record<string, any>, user) => {
+          acc[user.id] = user;
+          return acc;
+        }, {} as Record<string, any>);
+        console.log('✅ Fetched user data via service key:', Object.keys(userMap).length, 'users');
+      } else {
+        console.error('❌ Error fetching users via service key:', usersError);
+      }
+    }
+
+    // Fetch enrollments data separately
+    const seminarIds = seminars?.map(s => s.id).filter(Boolean) || [];
+    let enrollmentMap: Record<string, number> = {};
+
+    if (seminarIds.length > 0) {
+      const { data: enrollments, error: enrollmentsError } = await serviceSupabase
+        .from('enrollments')
+        .select('seminar_id, status')
+        .in('seminar_id', seminarIds);
+      
+      if (!enrollmentsError && enrollments) {
+        enrollmentMap = enrollments.reduce((acc: Record<string, number>, enrollment) => {
+          if (enrollment.status === 'approved') {
+            acc[enrollment.seminar_id] = (acc[enrollment.seminar_id] || 0) + 1;
+          }
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('✅ Fetched enrollment data via service key:', Object.keys(enrollmentMap).length, 'seminars');
+      } else {
+        console.error('❌ Error fetching enrollments via service key:', enrollmentsError);
+      }
+    }
+
     // Transform the data to match the frontend expectations
-    const transformedSeminars = seminars?.map(seminar => ({
-      id: seminar.id,
-      title: seminar.title,
-      description: seminar.description,
-      instructor: seminar.users?.name || 'Unknown',
-      startDate: seminar.start_date,
-      endDate: seminar.end_date,
-      capacity: seminar.capacity,
-      enrolled: seminar.enrollments?.filter(e => e.status === 'approved').length || 0,
-      location: seminar.location,
-      tags: seminar.tags || [],
-      status: seminar.status,
-      sessions: seminar.sessions?.length || 0,
-      applicationStart: seminar.application_start,
-      applicationEnd: seminar.application_end,
-      applicationType: seminar.application_type,
-    })) || [];
+    const transformedSeminars = seminars?.map(seminar => {
+      // Better fallback for instructor name
+      let instructorName = 'Unknown';
+      
+      // Try from JOIN first, then from separate fetch
+      const userInfo = seminar.users || userMap[seminar.owner_id];
+      
+      if (userInfo?.name) {
+        instructorName = userInfo.name;
+      } else {
+        // Log missing user info for debugging
+        console.warn(`⚠️ Missing user info for seminar "${seminar.title}" (owner_id: ${seminar.owner_id})`);
+        
+        // Try to get a better fallback from owner_id or other sources
+        if (seminar.owner_id) {
+          instructorName = `User ${seminar.owner_id.slice(0, 8)}...`;
+        }
+      }
+
+      return {
+        id: seminar.id,
+        title: seminar.title,
+        description: seminar.description,
+        instructor: instructorName,
+        startDate: seminar.start_date,
+        endDate: seminar.end_date,
+        capacity: seminar.capacity,
+        enrolled: enrollmentMap[seminar.id] || 0,
+        location: seminar.location,
+        tags: seminar.tags || [],
+        status: seminar.status,
+        sessions: seminar.sessions?.length || 0,
+        semester: seminar.semesters?.name || 'Unknown',
+        applicationStart: seminar.application_start,
+        applicationEnd: seminar.application_end,
+        applicationType: seminar.application_type,
+      };
+    }) || [];
 
     return NextResponse.json(transformedSeminars);
   } catch (error) {
