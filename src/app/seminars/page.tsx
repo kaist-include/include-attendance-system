@@ -27,11 +27,31 @@ interface Seminar {
 }
 
 const statusLabels = {
-  draft: { label: '준비중', color: 'bg-gray-100 text-gray-800' },
-  recruiting: { label: '모집중', color: 'bg-green-100 text-green-800' },
-  in_progress: { label: '진행중', color: 'bg-blue-100 text-blue-800' },
-  completed: { label: '완료', color: 'bg-gray-100 text-gray-800' },
-  cancelled: { label: '취소', color: 'bg-red-100 text-red-800' },
+  draft: {
+    label: '준비중',
+    color:
+      'bg-muted text-foreground/90 ring-1 ring-inset ring-border',
+  },
+  recruiting: {
+    label: '모집중',
+    color:
+      'bg-green-500/15 text-green-600 dark:text-green-300 ring-1 ring-inset ring-green-500/30',
+  },
+  in_progress: {
+    label: '진행중',
+    color:
+      'bg-blue-500/15 text-blue-600 dark:text-blue-300 ring-1 ring-inset ring-blue-500/30',
+  },
+  completed: {
+    label: '완료',
+    color:
+      'bg-muted text-foreground/80 ring-1 ring-inset ring-border',
+  },
+  cancelled: {
+    label: '취소',
+    color:
+      'bg-red-500/15 text-red-600 dark:text-red-300 ring-1 ring-inset ring-red-500/30',
+  },
 };
 
 export default function SeminarsPage() {
@@ -150,7 +170,7 @@ export default function SeminarsPage() {
             <div className="space-y-4">
               {/* 검색바 */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 opacity-80" />
                 <input
                   type="text"
                   placeholder="세미나 제목, 설명, 강사명으로 검색..."
@@ -241,22 +261,22 @@ export default function SeminarsPage() {
               <CardContent className="space-y-4">
                 {/* 기본 정보 */}
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <GraduationCap className="w-4 h-4 mr-2" />
                     <span>강사: {seminar.instructor}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4 mr-2" />
                     <span>
                       {new Date(seminar.startDate).toLocaleDateString('ko-KR')} ~ {' '}
                       {seminar.endDate ? new Date(seminar.endDate).toLocaleDateString('ko-KR') : '진행중'}
                     </span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <MapPin className="w-4 h-4 mr-2" />
                     <span>{seminar.location || '장소 미정'}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <Clock className="w-4 h-4 mr-2" />
                     <span>총 {seminar.sessions}회차</span>
                   </div>
@@ -287,7 +307,7 @@ export default function SeminarsPage() {
                   {seminar.tags.map(tag => (
                     <span
                       key={tag}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-foreground/90 ring-1 ring-inset ring-border"
                     >
                       <Tag className="w-3 h-3 mr-1" />
                       {tag}
