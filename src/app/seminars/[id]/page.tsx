@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, DATE_CONFIG, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import type { ApplicationType, Session } from '@/types';

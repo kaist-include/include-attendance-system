@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
 
