@@ -63,23 +63,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
   });
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-card text-card-foreground shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-border">
           <Link href={ROUTES.home} className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">I</span>
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">I</span>
             </div>
-            <span className="text-xl font-semibold text-gray-900">Include</span>
+            <span className="text-xl font-semibold text-foreground">Include</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+            className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
           >
             <span>✕</span>
           </button>
@@ -98,8 +98,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     className={cn(
                       "flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                        : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                        ? "bg-accent text-accent-foreground border-r-2 border-primary"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -113,16 +113,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </nav>
 
         {/* User Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200">
+        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border">
           <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
               <span className="text-lg">👤</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {profile?.nickname || user?.email || '사용자'}
               </p>
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {user?.email}
               </p>
             </div>
@@ -131,7 +131,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="space-y-1">
             <Link
               href={ROUTES.profile}
-              className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => setSidebarOpen(false)}
             >
               <span>⚙️</span>
@@ -140,7 +140,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             
             <button
               onClick={handleSignOut}
-              className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 w-full text-left"
+              className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground w-full text-left"
             >
               <span>🚪</span>
               <span>로그아웃</span>
@@ -152,12 +152,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         {/* Top Bar */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="bg-card text-card-foreground shadow-sm border-b border-border">
           <div className="flex items-center justify-between h-16 px-6">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+                className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
               >
                 <span>☰</span>
               </button>
@@ -165,32 +165,32 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {/* Search Bar */}
               <div className="hidden md:block relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-400">🔍</span>
+                  <span className="text-muted-foreground">🔍</span>
                 </div>
                 <input
                   type="text"
                   placeholder="세미나 검색..."
-                  className="block w-80 pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-80 pl-10 pr-3 py-2 border border-input bg-background rounded-lg text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                 />
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
               {/* Notifications */}
-              <button className="p-2 rounded-lg text-gray-400 hover:text-gray-500 hover:bg-gray-100 relative">
+              <button className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent relative">
                 <span>🔔</span>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
               </button>
 
               {/* User Avatar */}
               <Link
                 href={ROUTES.profile}
-                className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100"
+                className="flex items-center space-x-2 p-2 rounded-lg hover:bg-accent"
               >
-                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                   <span className="text-sm">👤</span>
                 </div>
-                <span className="hidden md:block text-sm font-medium text-gray-700">
+                <span className="hidden md:block text-sm font-medium text-muted-foreground">
                   {profile?.nickname || '사용자'}
                 </span>
               </Link>
@@ -199,7 +199,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-gray-50">
+        <main className="flex-1 overflow-auto bg-background">
           <div className="p-6">
             {children}
           </div>

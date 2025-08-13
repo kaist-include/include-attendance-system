@@ -113,8 +113,8 @@ export default function SeminarsPage() {
         {/* 헤더 */}
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">세미나</h1>
-            <p className="text-gray-600 mt-2">
+            <h1 className="text-3xl font-bold text-foreground">세미나</h1>
+            <p className="text-muted-foreground mt-2">
               다양한 주제의 세미나와 스터디에 참여해보세요
             </p>
           </div>
@@ -131,13 +131,13 @@ export default function SeminarsPage() {
             <div className="space-y-4">
               {/* 검색바 */}
               <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">🔍</span>
                 <input
                   type="text"
                   placeholder="세미나 제목, 설명, 강사명으로 검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                  className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                 />
               </div>
 
@@ -145,11 +145,11 @@ export default function SeminarsPage() {
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 {/* 상태 필터 */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-gray-500">🔽</span>
+                  <span className="text-muted-foreground">🔽</span>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
                   >
                     <option value="all">모든 상태</option>
                     <option value="recruiting">모집중</option>
@@ -166,8 +166,8 @@ export default function SeminarsPage() {
                       onClick={() => toggleTag(tag)}
                       className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                         selectedTags.includes(tag)
-                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                          : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                          ? 'bg-secondary text-foreground border border-border'
+                          : 'bg-muted text-muted-foreground border border-border hover:bg-accent'
                       }`}
                     >
                       {tag}
@@ -199,19 +199,19 @@ export default function SeminarsPage() {
               <CardContent className="space-y-4">
                 {/* 기본 정보 */}
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <span className="mr-2">👨‍🏫</span>
                     <span>강사: {seminar.instructor}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <span className="mr-2">📅</span>
                     <span>{seminar.startDate} ~ {seminar.endDate}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <span className="mr-2">📍</span>
                     <span>{seminar.location}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <span className="mr-2">⏰</span>
                     <span>총 {seminar.sessions}회차</span>
                   </div>
@@ -220,17 +220,17 @@ export default function SeminarsPage() {
                 {/* 정원 정보 */}
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">신청 현황</span>
+                    <span className="text-muted-foreground">신청 현황</span>
                     <span className="font-medium">
                       {seminar.enrolled}/{seminar.capacity}명
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${
                         seminar.enrolled >= seminar.capacity 
-                          ? 'bg-red-500' 
-                          : 'bg-blue-500'
+                          ? 'bg-destructive' 
+                          : 'bg-primary'
                       }`}
                       style={{ width: `${Math.min((seminar.enrolled / seminar.capacity) * 100, 100)}%` }}
                     />
@@ -242,7 +242,7 @@ export default function SeminarsPage() {
                   {seminar.tags.map(tag => (
                     <span
                       key={tag}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground"
                     >
                       <span className="mr-1">🏷️</span>
                       {tag}
@@ -278,11 +278,11 @@ export default function SeminarsPage() {
           <Card>
             <CardContent className="py-12">
               <div className="text-center">
-                <span className="block text-6xl mb-4 text-gray-300">🔍</span>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <span className="block text-6xl mb-4 opacity-30">🔍</span>
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   검색 결과가 없습니다
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   다른 검색어나 필터를 시도해보세요
                 </p>
                 <Button 
