@@ -11,6 +11,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Include 출석 관리 시스템",
   description: "KAIST Include 동아리 세미나 출석 관리 시스템",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

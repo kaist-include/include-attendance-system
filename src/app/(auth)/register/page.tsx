@@ -69,9 +69,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
-            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xl">I</span>
-            </div>
+            <img src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
             <span className="text-2xl font-bold text-foreground">Include</span>
           </Link>
           <p className="text-muted-foreground mt-2">새 계정을 만들어 시작하세요</p>

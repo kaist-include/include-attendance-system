@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 // Icons replaced with unicode symbols
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +24,11 @@ const seminars = [
     tags: ['React', 'Frontend', '심화'],
     status: 'recruiting' as const,
     sessions: 8,
+    semester: '2025-1',
+    sessionDetails: [
+      { number: 1, date: '2025-01-20', title: '고급 Hooks', description: 'useMemo/useCallback/useRef 심화' },
+      { number: 2, date: '2025-01-27', title: '상태관리 전략', description: 'Context/Reducer/외부상태 비교' },
+    ],
   },
   {
     id: 2,
@@ -38,6 +43,11 @@ const seminars = [
     tags: ['AI', 'Machine Learning', '기초'],
     status: 'recruiting' as const,
     sessions: 12,
+    semester: '2025-1',
+    sessionDetails: [
+      { number: 1, date: '2025-02-05', title: 'ML 개요', description: '지도/비지도 학습 소개' },
+      { number: 2, date: '2025-02-12', title: '선형회귀', description: '손실함수/경사하강법' },
+    ],
   },
   {
     id: 3,
@@ -52,6 +62,11 @@ const seminars = [
     tags: ['Backend', 'Architecture', '심화'],
     status: 'in_progress' as const,
     sessions: 10,
+    semester: '2024-2',
+    sessionDetails: [
+      { number: 1, date: '2024-11-10', title: '모놀리식 vs MSA', description: '트레이드오프' },
+      { number: 2, date: '2024-11-17', title: '이벤트 드리븐', description: '카프카/스트림' },
+    ],
   },
   {
     id: 4,
@@ -66,6 +81,10 @@ const seminars = [
     tags: ['Design', 'UI', 'UX', '기초'],
     status: 'recruiting' as const,
     sessions: 8,
+    semester: '2025-1',
+    sessionDetails: [
+      { number: 1, date: '2025-03-05', title: 'UX 원칙', description: '휴리스틱 평가' },
+    ],
   },
 ];
 
@@ -81,9 +100,12 @@ export default function SeminarsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [semesterFilter, setSemesterFilter] = useState<string>('all');
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   // 모든 태그 수집
   const allTags = Array.from(new Set(seminars.flatMap(seminar => seminar.tags)));
+  const allSemesters = Array.from(new Set(seminars.map(seminar => seminar.semester)));
 
   // 필터링된 세미나
   const filteredSeminars = seminars.filter(seminar => {
@@ -95,9 +117,21 @@ export default function SeminarsPage() {
                        selectedTags.some(tag => seminar.tags.includes(tag));
     
     const matchesStatus = statusFilter === 'all' || seminar.status === statusFilter;
+    const matchesSemester = semesterFilter === 'all' || seminar.semester === semesterFilter;
 
-    return matchesSearch && matchesTags && matchesStatus;
+    return matchesSearch && matchesTags && matchesStatus && matchesSemester;
   });
+
+  const groupedBySemester = useMemo(() => {
+    return filteredSeminars.reduce((acc, s) => {
+      (acc[s.semester] ||= []).push(s);
+      return acc;
+    }, {} as Record<string, typeof seminars[number][]>);
+  }, [filteredSeminars]);
+
+  const toggleExpand = (id: number) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => 
@@ -158,6 +192,21 @@ export default function SeminarsPage() {
                   </select>
                 </div>
 
+                {/* 학기 필터 */}
+                <div className="flex items-center space-x-2">
+                  <span className="text-muted-foreground">📚</span>
+                  <select
+                    value={semesterFilter}
+                    onChange={(e) => setSemesterFilter(e.target.value)}
+                    className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
+                  >
+                    <option value="all">모든 학기</option>
+                    {allSemesters.map(sem => (
+                      <option key={sem} value={sem}>{sem}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* 태그 필터 */}
                 <div className="flex flex-wrap gap-2">
                   {allTags.map(tag => (
@@ -179,99 +228,132 @@ export default function SeminarsPage() {
           </CardContent>
         </Card>
 
-        {/* 세미나 목록 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredSeminars.map((seminar) => (
-            <Card key={seminar.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl">{seminar.title}</CardTitle>
-                    <CardDescription className="mt-2 text-base">
-                      {seminar.description}
-                    </CardDescription>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusLabels[seminar.status].color}`}>
-                    {statusLabels[seminar.status].label}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 기본 정보 */}
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <span className="mr-2">👨‍🏫</span>
-                    <span>강사: {seminar.instructor}</span>
-                  </div>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <span className="mr-2">📅</span>
-                    <span>{seminar.startDate} ~ {seminar.endDate}</span>
-                  </div>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <span className="mr-2">📍</span>
-                    <span>{seminar.location}</span>
-                  </div>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <span className="mr-2">⏰</span>
-                    <span>총 {seminar.sessions}회차</span>
-                  </div>
-                </div>
+        {/* 세미나 목록 (학기별 그룹) */}
+        {Object.keys(groupedBySemester).length === 0 ? (
+          <></>
+        ) : (
+          <div className="space-y-8">
+            {Object.entries(groupedBySemester).sort(([a],[b]) => (a < b ? 1 : -1)).map(([sem, list]) => (
+              <div key={sem} className="space-y-4">
+                <h2 className="text-xl font-semibold text-foreground">{sem}</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {list.map((seminar) => (
+                    <Card key={seminar.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="text-xl">{seminar.title}</CardTitle>
+                            <CardDescription className="mt-2 text-base">
+                              {seminar.description}
+                            </CardDescription>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusLabels[seminar.status].color}`}>
+                            {statusLabels[seminar.status].label}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* 기본 정보 */}
+                        <div className="space-y-2">
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <span className="mr-2">👨‍🏫</span>
+                            <span>강사: {seminar.instructor}</span>
+                          </div>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <span className="mr-2">📅</span>
+                            <span>{seminar.startDate} ~ {seminar.endDate}</span>
+                          </div>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <span className="mr-2">📍</span>
+                            <span>{seminar.location}</span>
+                          </div>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <span className="mr-2">⏰</span>
+                            <span>총 {seminar.sessions}회차</span>
+                          </div>
+                        </div>
 
-                {/* 정원 정보 */}
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">신청 현황</span>
-                    <span className="font-medium">
-                      {seminar.enrolled}/{seminar.capacity}명
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        seminar.enrolled >= seminar.capacity 
-                          ? 'bg-destructive' 
-                          : 'bg-primary'
-                      }`}
-                      style={{ width: `${Math.min((seminar.enrolled / seminar.capacity) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
+                        {/* 정원 정보 */}
+                        <div>
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="text-muted-foreground">신청 현황</span>
+                            <span className="font-medium">
+                              {seminar.enrolled}/{seminar.capacity}명
+                            </span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${
+                                seminar.enrolled >= seminar.capacity 
+                                  ? 'bg-destructive' 
+                                  : 'bg-primary'
+                              }`}
+                              style={{ width: `${Math.min((seminar.enrolled / seminar.capacity) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
 
-                {/* 태그 */}
-                <div className="flex flex-wrap gap-1">
-                  {seminar.tags.map(tag => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground"
-                    >
-                      <span className="mr-1">🏷️</span>
-                      {tag}
-                    </span>
+                        {/* 태그 */}
+                        <div className="flex flex-wrap gap-1">
+                          {seminar.tags.map(tag => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground"
+                            >
+                              <span className="mr-1">🏷️</span>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* 회차별 관리 (토글) */}
+                        {seminar.sessionDetails?.length ? (
+                          <div className="pt-2">
+                            <Button variant="outline" onClick={() => toggleExpand(seminar.id)}>
+                              {expanded[seminar.id] ? '회차 접기' : '회차 상세 보기'}
+                            </Button>
+                            {expanded[seminar.id] && (
+                              <div className="mt-3 space-y-2">
+                                {seminar.sessionDetails.map((sd: any) => (
+                                  <div key={sd.number} className="border border-border rounded-lg p-3">
+                                    <div className="text-sm text-muted-foreground">
+                                      {sd.number}회차 · {sd.date}
+                                    </div>
+                                    <div className="font-medium text-foreground">{sd.title}</div>
+                                    <div className="text-sm text-muted-foreground">{sd.description}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* 액션 버튼 */}
+                        <div className="flex space-x-2 pt-2">
+                          <Link href={ROUTES.seminarDetail(seminar.id.toString())} className="flex-1">
+                            <Button variant="outline" className="w-full">
+                              상세보기
+                            </Button>
+                          </Link>
+                          {user && seminar.status === 'recruiting' && seminar.enrolled < seminar.capacity && (
+                            <Button className="flex-1">
+                              신청하기
+                            </Button>
+                          )}
+                          {user && seminar.status === 'recruiting' && seminar.enrolled >= seminar.capacity && (
+                            <Button variant="secondary" className="flex-1" disabled>
+                              정원 마감
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-
-                {/* 액션 버튼 */}
-                <div className="flex space-x-2 pt-2">
-                  <Link href={ROUTES.seminarDetail(seminar.id.toString())} className="flex-1">
-                    <Button variant="outline" className="w-full">
-                      상세보기
-                    </Button>
-                  </Link>
-                  {user && seminar.status === 'recruiting' && seminar.enrolled < seminar.capacity && (
-                    <Button className="flex-1">
-                      신청하기
-                    </Button>
-                  )}
-                  {user && seminar.status === 'recruiting' && seminar.enrolled >= seminar.capacity && (
-                    <Button variant="secondary" className="flex-1" disabled>
-                      정원 마감
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 검색 결과 없음 */}
         {filteredSeminars.length === 0 && (

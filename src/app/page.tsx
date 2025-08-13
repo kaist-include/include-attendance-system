@@ -57,9 +57,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">I</span>
-              </div>
+              <img src="/icon.svg" alt="Include" className="w-10 h-10 rounded" />
               <h1 className="text-2xl font-bold text-foreground">Include</h1>
             </div>
             <div className="flex items-center space-x-4">
@@ -153,11 +151,9 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-popover text-popover-foreground py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold">I</span>
-              </div>
+              <img src="/logo.svg" alt="Include" className="w-8 h-8 rounded" />
               <span className="text-xl font-bold">Include 출석 시스템</span>
             </div>
             <div className="text-muted-foreground">
