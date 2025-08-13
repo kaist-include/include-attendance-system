@@ -9,27 +9,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Include 출석 관리 시스템",
+  title: "Attendtion by include",
   description: "KAIST Include 동아리 세미나 출석 관리 시스템",
-  keywords: ["KAIST", "Include", "세미나", "출석", "관리", "동아리"],
-  authors: [{ name: "KAIST Include" }],
-  creator: "KAIST Include",
-  publisher: "KAIST Include",
-  robots: "index, follow",
   icons: {
-    icon: [
-      {
-        url: '/favicon.ico',
-        sizes: 'any',
-      },
-    ],
-    shortcut: '/favicon.ico',
+    icon: "/icon.svg",
   },
-};
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
 };
 
 export default function RootLayout({
