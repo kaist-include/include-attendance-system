@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// Icons replaced with unicode symbols
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/config/constants';
 
 export default function LoginPage() {
@@ -25,10 +25,13 @@ export default function LoginPage() {
     setError('');
 
     try {
+      console.log('Attempting to sign in with:', email);
       await signIn(email, password);
+      console.log('Sign in successful, redirecting to dashboard');
       router.push(ROUTES.dashboard);
-    } catch (err) {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+    } catch (err: any) {
+      console.error('Sign in error:', err);
+      setError(err.message || '이메일 또는 비밀번호가 올바르지 않습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +72,7 @@ export default function LoginPage() {
                   이메일
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">📧</span>
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     id="email"
                     type="email"
@@ -87,7 +90,7 @@ export default function LoginPage() {
                   비밀번호
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">🔒</span>
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -102,7 +105,7 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    <span>{showPassword ? '🙈' : '👁️'}</span>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -111,10 +114,9 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                loading={isLoading}
-                disabled={!email || !password}
+                disabled={!email || !password || isLoading}
               >
-                로그인
+                {isLoading ? '로그인 중...' : '로그인'}
               </Button>
             </form>
 

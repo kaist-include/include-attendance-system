@@ -3,8 +3,19 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-// Icons replaced with unicode symbols
-import { cn } from '@/utils';
+import { 
+  Menu, 
+  X, 
+  Home, 
+  Calendar, 
+  Users, 
+  Settings, 
+  LogOut,
+  User,
+  Bell,
+  Search
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/config/constants';
 
@@ -15,7 +26,7 @@ interface MainLayoutProps {
 interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
 }
 
@@ -23,17 +34,17 @@ const navItems: NavItem[] = [
   {
     href: ROUTES.dashboard,
     label: '대시보드',
-    icon: '🏠',
+    icon: Home,
   },
   {
     href: ROUTES.seminars,
     label: '세미나',
-    icon: '📅',
+    icon: Calendar,
   },
   {
     href: ROUTES.admin,
     label: '관리자',
-    icon: '👥',
+    icon: Users,
     roles: ['admin', 'seminar_leader'],
   },
 ];
@@ -82,7 +93,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
           >
-            <span>✕</span>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -90,6 +101,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <nav className="mt-8 px-6">
           <ul className="space-y-2">
             {filteredNavItems.map((item) => {
+              const Icon = item.icon;
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               
               return (
@@ -104,7 +116,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     )}
                     onClick={() => setSidebarOpen(false)}
                   >
-                    <span>{item.icon}</span>
+                    <Icon className="w-5 h-5" />
                     <span>{item.label}</span>
                   </Link>
                 </li>
@@ -117,7 +129,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-              <span className="text-lg">👤</span>
+              <User className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">
@@ -135,7 +147,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => setSidebarOpen(false)}
             >
-              <span>⚙️</span>
+              <Settings className="w-4 h-4" />
               <span>설정</span>
             </Link>
             
@@ -143,7 +155,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               onClick={handleSignOut}
               className="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground w-full text-left"
             >
-              <span>🚪</span>
+              <LogOut className="w-4 h-4" />
               <span>로그아웃</span>
             </button>
           </div>
@@ -160,13 +172,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
               >
-                <span>☰</span>
+                <Menu className="w-5 h-5" />
               </button>
               
               {/* Search Bar */}
               <div className="hidden md:block relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-muted-foreground">🔍</span>
+                  <Search className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <input
                   type="text"
@@ -179,7 +191,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <div className="flex items-center space-x-4">
               {/* Notifications */}
               <button className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent relative">
-                <span>🔔</span>
+                <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
               </button>
 
@@ -188,8 +200,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 href={ROUTES.profile}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-accent"
               >
+<<<<<<< HEAD
                 <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                  <span className="text-sm">👤</span>
+                  <User className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <span className="hidden md:block text-sm font-medium text-muted-foreground">
                   {profile?.nickname || '사용자'}

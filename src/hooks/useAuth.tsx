@@ -4,11 +4,12 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase, getCurrentUser, signOut } from '@/lib/supabase';
 import { Profile, UserRole } from '@/types';
-import { getErrorMessage } from '@/utils';
+import { getErrorMessage } from '@/lib/utils';
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
+  userRole: UserRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
@@ -33,6 +34,7 @@ export const useAuth = () => {
 export const useAuthProvider = (): AuthContextType => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +49,7 @@ export const useAuthProvider = (): AuthContextType => {
         if (mounted) {
           if (session?.user) {
             setUser(session.user);
-            await loadUserProfile(session.user.id);
+            await loadUserData(session.user.id);
           }
           setLoading(false);
         }
@@ -68,10 +70,11 @@ export const useAuthProvider = (): AuthContextType => {
 
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
-          await loadUserProfile(session.user.id);
+          await loadUserData(session.user.id);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
+          setUserRole(null);
         }
         
         setLoading(false);
@@ -84,18 +87,45 @@ export const useAuthProvider = (): AuthContextType => {
     };
   }, []);
 
-  // Load user profile
-  const loadUserProfile = async (userId: string) => {
+  // Load user data (both profile and role)
+  const loadUserData = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      // Load user role from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (userError) {
+        console.error('Error loading user role:', userError);
+        
+        // If user doesn't exist in users table, create one
+        if (userError.code === 'PGRST116') {
+          console.log('User not found in users table, will be created by trigger or manually');
+          
+          // For now, set a default role and let the user know they need to be added to the system
+          setUserRole('member' as UserRole);
+          console.log('Temporarily set role to member - user record needs to be created in database');
+        } else {
+          throw userError;
+        }
+      } else {
+        setUserRole(userData.role as UserRole);
+      }
+
+      // Load user profile
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
 
-      if (error) {
+      if (profileError) {
         // If profile doesn't exist, create one
-        if (error.code === 'PGRST116') {
+        if (profileError.code === 'PGRST116') {
+          console.log('Profile not found, creating profile...');
+          
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert({
@@ -105,15 +135,21 @@ export const useAuthProvider = (): AuthContextType => {
             .select()
             .single();
 
-          if (createError) throw createError;
+          if (createError) {
+            console.error('Error creating profile:', createError);
+            throw createError;
+          }
+          
+          console.log('Profile created successfully:', newProfile);
           setProfile(newProfile);
         } else {
-          throw error;
+          throw profileError;
         }
       } else {
-        setProfile(data);
+        setProfile(profileData);
       }
     } catch (err) {
+      console.error('Error loading user data:', err);
       setError(getErrorMessage(err));
     }
   };
@@ -124,12 +160,14 @@ export const useAuthProvider = (): AuthContextType => {
       setLoading(true);
       setError(null);
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
+
+      // User data will be loaded automatically by the auth state change listener
     } catch (err) {
       setError(getErrorMessage(err));
       throw err;
@@ -204,16 +242,25 @@ export const useAuthProvider = (): AuthContextType => {
 
   // Role checking utilities
   const hasRole = (role: UserRole): boolean => {
-    if (!profile) return false;
-    return profile.user_id === user?.id; // Will be updated when user roles are implemented
+    if (!userRole) return false;
+    
+    // Admin has access to everything
+    if (userRole === 'admin') return true;
+    
+    // Seminar leaders have access to seminar_leader and member roles
+    if (userRole === 'seminar_leader' && (role === 'seminar_leader' || role === 'member')) return true;
+    
+    // Check exact role match
+    return userRole === role;
   };
 
-  const isAdmin = hasRole('admin');
-  const isSeminarLeader = hasRole('seminar_leader') || isAdmin;
+  const isAdmin = userRole === 'admin';
+  const isSeminarLeader = userRole === 'seminar_leader' || isAdmin;
 
   return {
     user,
     profile,
+    userRole,
     loading,
     signIn,
     signUp,
