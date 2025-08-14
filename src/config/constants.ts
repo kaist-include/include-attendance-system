@@ -148,10 +148,20 @@ export const ROUTES = {
   seminarDetail: (id: string) => `/seminars/${id}`,
   createSeminar: '/seminars/create',
   editSeminar: (id: string) => `/seminars/${id}/edit`,
+  applySeminar: (id: string) => `/seminars/${id}/apply`,
   admin: '/admin',
   profile: '/profile',
   settings: '/settings',
 } as const;
+
+// Semester options and labels
+export const SEMESTER_OPTIONS: { code: string; label: string }[] = [
+  { code: '2024-1', label: '2024년 봄학기' },
+  { code: '2024-2', label: '2024년 가을학기' },
+  { code: '2025-1', label: '2025년 봄학기' },
+  { code: '2025-summer', label: '2025년 여름학기' },
+  { code: '2025-fall', label: '2025년 가을학기' },
+];
 
 // API Endpoints
 export const API_ENDPOINTS = {
