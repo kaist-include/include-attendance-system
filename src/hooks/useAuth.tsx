@@ -100,13 +100,40 @@ export const useAuthProvider = (): AuthContextType => {
       if (userError) {
         console.error('Error loading user role:', userError);
         
-        // If user doesn't exist in users table, create one
+        // If user doesn't exist in users table, try to sync/create the user
         if (userError.code === 'PGRST116') {
-          console.log('User not found in users table, will be created by trigger or manually');
+          console.log('🔄 User not found in users table, attempting to sync...');
           
-          // For now, set a default role and let the user know they need to be added to the system
-          setUserRole('member' as UserRole);
-          console.log('Temporarily set role to member - user record needs to be created in database');
+          try {
+            // Get current session for API call
+            const { data: sessionData } = await supabase.auth.getSession();
+            const session = sessionData?.session;
+            
+            if (session?.access_token) {
+              const response = await fetch('/api/users/sync', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                console.log('✅ User synced successfully:', result.user);
+                setUserRole(result.user.role as UserRole);
+              } else {
+                console.error('❌ Failed to sync user');
+                setUserRole('member' as UserRole); // Fallback
+              }
+            } else {
+              console.error('❌ No session token available for sync');
+              setUserRole('member' as UserRole); // Fallback
+            }
+          } catch (syncError) {
+            console.error('❌ Error during user sync:', syncError);
+            setUserRole('member' as UserRole); // Fallback
+          }
         } else {
           throw userError;
         }

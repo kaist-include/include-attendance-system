@@ -192,7 +192,6 @@ export default function SeminarsPage() {
                   >
                     <option value="all">모든 상태</option>
                     <option value="draft">준비중</option>
-                    <option value="recruiting">모집중</option>
                     <option value="in_progress">진행중</option>
                     <option value="completed">완료</option>
                     <option value="cancelled">취소</option>
@@ -249,7 +248,10 @@ export default function SeminarsPage() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-xl">{seminar.title}</CardTitle>
-                    <CardDescription className="mt-2 text-base">
+                    <div className="text-sm text-muted-foreground mt-1 mb-2">
+                      담당자: <span className="font-medium">{seminar.instructor}</span>
+                    </div>
+                    <CardDescription className="text-base">
                       {seminar.description}
                     </CardDescription>
                   </div>
@@ -261,10 +263,6 @@ export default function SeminarsPage() {
               <CardContent className="space-y-4">
                 {/* 기본 정보 */}
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <GraduationCap className="w-4 h-4 mr-2" />
-                    <span>강사: {seminar.instructor}</span>
-                  </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4 mr-2" />
                     <span>
@@ -279,6 +277,10 @@ export default function SeminarsPage() {
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Clock className="w-4 h-4 mr-2" />
                     <span>총 {seminar.sessions}회차</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Users className="w-4 h-4 mr-2" />
+                    <span>학기: {seminar.semester}</span>
                   </div>
                 </div>
 

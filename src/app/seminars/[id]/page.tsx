@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +8,50 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, DATE_CONFIG, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import type { ApplicationType, Session } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 const semesterOptions = ['2025-1', '2024-2', '2024-1', '2023-2'];
 const categoryTags = ['기초', '백엔드', '프론트엔드', 'AI'];
+
+interface SeminarData {
+  id: string;
+  title: string;
+  description: string;
+  capacity: number;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  semester: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+  };
+  startDate: string;
+  endDate: string | null;
+  location: string | null;
+  tags: string[];
+  status: string;
+  applicationStart: string;
+  applicationEnd: string;
+  applicationType: ApplicationType;
+  enrollments: {
+    total: number;
+    approved: number;
+    pending: number;
+    rejected: number;
+  };
+  currentUserEnrollment: {
+    status: 'pending' | 'approved' | 'rejected';
+    applied_at: string;
+  } | null;
+  sessions: Session[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function SeminarDetailPage() {
   const params = useParams<{ id: string }>();
@@ -18,110 +59,351 @@ export default function SeminarDetailPage() {
   const router = useRouter();
   const { user, isAdmin, isSeminarLeader } = useAuth();
 
-  // Mocked seminar data (replace with API integration)
-  const [title, setTitle] = useState('React 심화 세미나');
-  const [description, setDescription] = useState(
-    'React의 고급 패턴과 성능 최적화 기법을 학습합니다. Hooks, Context API, 메모이제이션 등을 다룹니다.'
-  );
-  const [semester, setSemester] = useState<string>('2025-1');
-  const [capacity, setCapacity] = useState<number>(24);
-  const [enrolled, setEnrolled] = useState<number>(18);
-  const [location, setLocation] = useState<string>('온라인 (Zoom)');
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '2025-01-15', end: '2025-03-15' });
-  const [applicationRange, setApplicationRange] = useState<{ start: string; end: string }>({ start: '2024-12-20', end: '2025-01-20' });
-  const [applicationType, setApplicationType] = useState<ApplicationType>('first_come');
-  const [tags, setTags] = useState<string[]>(['React', 'Frontend', '심화']);
+  // State for seminar data
+  const [seminarData, setSeminarData] = useState<SeminarData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const [newTag, setNewTag] = useState('');
+  // Editing states
   const [isEditing, setIsEditing] = useState(false);
-  const canManage = isAdmin || isSeminarLeader;
+  const [editData, setEditData] = useState<{
+    title: string;
+    description: string;
+    capacity: number;
+    location: string;
+    startDate: string;
+    endDate: string;
+    applicationStart: string;
+    applicationEnd: string;
+    applicationType: ApplicationType;
+    tags: string[];
+  } | null>(null);
 
-  const [sessions, setSessions] = useState<Session[]>([
-    {
-      id: 's1',
-      seminar_id: id || '1',
-      session_number: 1,
-      title: '고급 Hooks 활용',
-      description: 'useMemo, useCallback, useRef 심화',
-      date: '2025-01-20',
-      duration_minutes: 120,
-      location: '온라인',
-      materials_url: '',
-      status: 'scheduled',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: 's2',
-      seminar_id: id || '1',
-      session_number: 2,
-      title: '상태관리 전략',
-      description: 'Context, Reducer 패턴, 외부 상태관리 비교',
-      date: '2025-01-27',
-      duration_minutes: 120,
-      location: '온라인',
-      materials_url: '',
-      status: 'scheduled',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ]);
-
+  // Session management states
   const [newSession, setNewSession] = useState<{
     title: string;
     description: string;
     date: string;
-    duration: number;
+    duration_minutes: number;
     location: string;
-  }>({ title: '', description: '', date: '', duration: DEFAULTS.sessionDuration, location: '' });
+  }>({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
 
-  const capacityRate = useMemo(() => {
-    if (capacity <= 0) return 0;
-    return Math.min((enrolled / capacity) * 100, 100);
-  }, [capacity, enrolled]);
+  const [newTag, setNewTag] = useState('');
+  const [addingSession, setAddingSession] = useState(false);
 
-  const handleAddTag = () => {
-    const tag = newTag.trim();
-    if (!tag) return;
-    if (tags.length >= VALIDATION_RULES.seminar.maxTags) return;
-    if (tags.includes(tag)) return;
-    setTags(prev => [...prev, tag]);
-    setNewTag('');
+  const canManage = isAdmin || (isSeminarLeader && user?.id === seminarData?.owner.id);
+
+  // Helper function to get auth token
+  const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
   };
 
-  const handleRemoveTag = (tag: string) => {
-    setTags(prev => prev.filter(t => t !== tag));
-  };
+  // Load seminar data
+  useEffect(() => {
+    if (!id) return;
 
-  const handleAddSession = () => {
-    if (!newSession.title || !newSession.date) return;
-    const nextNumber = sessions.length + 1;
-    const session: Session = {
-      id: `tmp-${Date.now()}`,
-      seminar_id: id || '1',
-      session_number: nextNumber,
-      title: newSession.title,
-      description: newSession.description,
-      date: newSession.date,
-      duration_minutes: newSession.duration,
-      location: newSession.location,
-      materials_url: '',
-      status: 'scheduled',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    let mounted = true;
+
+    const loadSeminarData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = await getAuthToken();
+        
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`/api/seminars/${id}`, { headers });
+        
+        if (!mounted) return;
+        
+        if (!response.ok) {
+          throw new Error('Failed to load seminar data');
+        }
+
+        const data: SeminarData = await response.json();
+        
+        if (mounted) {
+          setSeminarData(data);
+          
+          // Initialize edit data
+          setEditData({
+            title: data.title,
+            description: data.description,
+            capacity: data.capacity,
+            location: data.location || '',
+            startDate: data.startDate,
+            endDate: data.endDate || '',
+            applicationStart: data.applicationStart,
+            applicationEnd: data.applicationEnd,
+            applicationType: data.applicationType,
+            tags: [...data.tags]
+          });
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+          console.error('Error loading seminar:', err);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     };
-    setSessions(prev => [...prev, session]);
-    setNewSession({ title: '', description: '', date: '', duration: DEFAULTS.sessionDuration, location: '' });
+
+    loadSeminarData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  // Helper function to refresh seminar data
+  const refreshSeminarData = async () => {
+    try {
+      const token = await getAuthToken();
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`/api/seminars/${id}`, { headers });
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh seminar data');
+      }
+
+      const data: SeminarData = await response.json();
+      setSeminarData(data);
+      
+      // Update edit data with new dates but keep other edits
+      setEditData(prev => prev ? {
+        ...prev,
+        startDate: data.startDate,
+        endDate: data.endDate || ''
+      } : null);
+    } catch (err) {
+      console.error('Error refreshing seminar:', err);
+    }
   };
 
+  // Save seminar data
+  const handleSave = async () => {
+    if (!editData || !seminarData) return;
+
+    try {
+      setSaving(true);
+      const token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/seminars/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: editData.title,
+          description: editData.description,
+          capacity: editData.capacity,
+          location: editData.location || null,
+          applicationStart: editData.applicationStart,
+          applicationEnd: editData.applicationEnd,
+          applicationType: editData.applicationType,
+          tags: editData.tags
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update seminar');
+      }
+
+      // Update local state
+      setSeminarData(prev => prev ? {
+        ...prev,
+        title: editData.title,
+        description: editData.description,
+        capacity: editData.capacity,
+        location: editData.location,
+        startDate: prev.startDate, // Keep existing startDate
+        endDate: prev.endDate, // Keep existing endDate
+        applicationStart: editData.applicationStart,
+        applicationEnd: editData.applicationEnd,
+        applicationType: editData.applicationType,
+        tags: editData.tags
+      } : null);
+
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      console.error('Error saving seminar:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add session
+  const handleAddSession = async () => {
+    if (!newSession.title || !newSession.date) return;
+
+    try {
+      setAddingSession(true);
+      const token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/seminars/${id}/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+      title: newSession.title,
+          description: newSession.description || null,
+      date: newSession.date,
+          duration_minutes: newSession.duration_minutes,
+          location: newSession.location || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create session');
+      }
+
+      const newSessionData: Session = await response.json();
+      
+      // Update local state
+      setSeminarData(prev => prev ? {
+        ...prev,
+        sessions: [...prev.sessions, newSessionData].sort((a, b) => a.session_number - b.session_number)
+      } : null);
+
+      // Reset form
+      setNewSession({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+
+      // Refresh seminar data to get updated start/end dates
+      await refreshSeminarData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add session');
+      console.error('Error adding session:', err);
+    } finally {
+      setAddingSession(false);
+    }
+  };
+
+  // Delete session
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm('이 세션을 삭제하시겠습니까?')) return;
+
+    try {
+      const token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/seminars/${id}/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete session');
+      }
+
+      // Update local state
+      setSeminarData(prev => prev ? {
+        ...prev,
+        sessions: prev.sessions.filter(s => s.id !== sessionId)
+      } : null);
+
+      // Refresh seminar data to get updated start/end dates
+      await refreshSeminarData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete session');
+      console.error('Error deleting session:', err);
+    }
+  };
+
+  // Handle enrollment
   const handleEnroll = () => {
     if (!user) {
       router.push(ROUTES.login + `?redirect=${encodeURIComponent(ROUTES.seminarDetail(id || ''))}`);
       return;
     }
-    if (enrolled >= capacity) return;
-    setEnrolled(prev => Math.min(prev + 1, capacity));
+    if (!seminarData || seminarData.enrollments.approved >= seminarData.capacity) return;
+    
+    // TODO: Implement enrollment API call
+    console.log('Enrollment feature to be implemented');
   };
+
+  // Tag management
+  const handleAddTag = () => {
+    if (!editData) return;
+    const tag = newTag.trim();
+    if (!tag) return;
+    if (editData.tags.length >= VALIDATION_RULES.seminar.maxTags) return;
+    if (editData.tags.includes(tag)) return;
+    
+    setEditData(prev => prev ? { ...prev, tags: [...prev.tags, tag] } : null);
+    setNewTag('');
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    if (!editData) return;
+    setEditData(prev => prev ? { ...prev, tags: prev.tags.filter(t => t !== tag) } : null);
+  };
+
+  const capacityRate = useMemo(() => {
+    if (!seminarData || seminarData.capacity <= 0) return 0;
+    return Math.min((seminarData.enrollments.approved / seminarData.capacity) * 100, 100);
+  }, [seminarData]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">세미나 정보를 불러오는 중...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error || !seminarData) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-96">
+          <div className="text-center">
+            <p className="text-destructive mb-4">{error || '세미나를 찾을 수 없습니다.'}</p>
+            <Button onClick={() => router.push(ROUTES.seminars)}>목록으로 돌아가기</Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -129,23 +411,44 @@ export default function SeminarDetailPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+            <h1 className="text-3xl font-bold text-foreground">{seminarData.title}</h1>
             <div className="flex items-center gap-2 mt-2">
-              <span className="px-2 py-1 rounded-full text-xs font-medium bg-secondary text-foreground">{semester}</span>
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-secondary text-foreground">
+                {seminarData.semester.name}
+              </span>
               <div className="flex flex-wrap gap-1">
-                {tags.map(tag => (
-                  <span key={tag} className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">#{tag}</span>
+                {seminarData.tags.map(tag => (
+                  <span key={tag} className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                    #{tag}
+                  </span>
                 ))}
               </div>
             </div>
           </div>
           <div className="mt-4 md:mt-0 flex gap-2">
             <Button variant="outline" onClick={() => router.push(ROUTES.seminars)}>목록으로</Button>
-            <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>신청 관리</Button>
-            <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>출석 관리</Button>
-            {enrolled < capacity ? (
+            {canManage && (
+              <>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>신청 관리</Button>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>출석 관리</Button>
+              </>
+            )}
+            {!user ? (
+              <Button onClick={handleEnroll}>신청하기</Button>
+            ) : seminarData.currentUserEnrollment ? (
+              // 이미 신청한 사용자
+              seminarData.currentUserEnrollment.status === 'pending' ? (
+                <Button variant="secondary" disabled>신청중</Button>
+              ) : seminarData.currentUserEnrollment.status === 'approved' ? (
+                <Button variant="outline" disabled>수강중</Button>
+              ) : (
+                <Button variant="destructive" disabled>신청 거절</Button>
+              )
+            ) : seminarData.enrollments.approved < seminarData.capacity ? (
+              // 신청하지 않았고 정원이 남은 경우
               <Button onClick={handleEnroll}>신청하기</Button>
             ) : (
+              // 정원 마감
               <Button variant="secondary" disabled>정원 마감</Button>
             )}
           </div>
@@ -162,14 +465,14 @@ export default function SeminarDetailPage() {
               {/* Left: Description */}
               <div className="lg:col-span-2">
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">설명</h3>
-                {isEditing ? (
+                {isEditing && editData ? (
                   <textarea
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
+                    value={editData.description}
+                    onChange={e => setEditData(prev => prev ? { ...prev, description: e.target.value } : null)}
                     className="w-full min-h-32 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 ) : (
-                  <p className="text-foreground">{description}</p>
+                  <p className="text-foreground">{seminarData.description}</p>
                 )}
               </div>
               {/* Right: Facts */}
@@ -178,11 +481,11 @@ export default function SeminarDetailPage() {
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">정원</h3>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">신청 현황</span>
-                    <span className="font-medium">{enrolled}/{capacity}명</span>
+                    <span className="font-medium">{seminarData.enrollments.approved}/{seminarData.capacity}명</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full ${enrolled >= capacity ? 'bg-destructive' : 'bg-primary'}`}
+                      className={`h-2 rounded-full ${seminarData.enrollments.approved >= seminarData.capacity ? 'bg-destructive' : 'bg-primary'}`}
                       style={{ width: `${capacityRate}%` }}
                     />
                   </div>
@@ -190,59 +493,76 @@ export default function SeminarDetailPage() {
 
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">일정</h3>
-                  {isEditing ? (
+                  {isEditing && editData ? (
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="date"
-                        value={dateRange.start}
-                        onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
-                        className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                        value={editData.startDate}
+                        readOnly
+                        className="px-3 py-2 rounded-lg border border-input bg-muted text-muted-foreground cursor-not-allowed focus:outline-none"
+                        title="세션 날짜에 따라 자동으로 계산됩니다"
                       />
                       <input
                         type="date"
-                        value={dateRange.end}
-                        onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
-                        className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                        value={editData.endDate}
+                        readOnly
+                        className="px-3 py-2 rounded-lg border border-input bg-muted text-muted-foreground cursor-not-allowed focus:outline-none"
+                        title="세션 날짜에 따라 자동으로 계산됩니다"
                       />
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">{dateRange.start} ~ {dateRange.end}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {seminarData.startDate} ~ {seminarData.endDate || '미정'}
+                    </p>
+                  )}
+                  {isEditing && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      💡 일정은 세션 날짜에 따라 자동으로 계산됩니다
+                    </p>
                   )}
                 </div>
 
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">신청기간</h3>
-                  {isEditing ? (
+                  {isEditing && editData ? (
                     <div className="grid grid-cols-2 gap-2">
                       <input
-                        type="date"
-                        value={applicationRange.start}
-                        onChange={e => setApplicationRange(r => ({ ...r, start: e.target.value }))}
+                        type="datetime-local"
+                        value={editData.applicationStart.slice(0, 16)}
+                        onChange={e => setEditData(prev => prev ? { ...prev, applicationStart: e.target.value } : null)}
                         className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                       <input
-                        type="date"
-                        value={applicationRange.end}
-                        onChange={e => setApplicationRange(r => ({ ...r, end: e.target.value }))}
+                        type="datetime-local"
+                        value={editData.applicationEnd.slice(0, 16)}
+                        onChange={e => setEditData(prev => prev ? { ...prev, applicationEnd: e.target.value } : null)}
                         className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">{applicationRange.start} ~ {applicationRange.end}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(seminarData.applicationStart).toLocaleDateString()} ~ {new Date(seminarData.applicationEnd).toLocaleDateString()}
+                    </p>
                   )}
                 </div>
 
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">장소</h3>
-                  {isEditing ? (
+                  {isEditing && editData ? (
                     <input
-                      value={location}
-                      onChange={e => setLocation(e.target.value)}
+                      value={editData.location}
+                      onChange={e => setEditData(prev => prev ? { ...prev, location: e.target.value } : null)}
                       className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   ) : (
-                    <p className="text-sm text-muted-foreground">{location}</p>
+                    <p className="text-sm text-muted-foreground">{seminarData.location || '미정'}</p>
                   )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">담당자</h3>
+                  <p className="text-sm text-muted-foreground">{seminarData.owner.name}</p>
+                  <p className="text-xs text-muted-foreground">{seminarData.owner.email}</p>
                 </div>
               </div>
             </div>
@@ -250,26 +570,9 @@ export default function SeminarDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="space-y-4 lg:col-span-2">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">학기</h3>
-                  {canManage && isEditing ? (
-                    <select
-                      value={semester}
-                      onChange={e => setSemester(e.target.value)}
-                      className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
-                    >
-                      {semesterOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{semester}</p>
-                  )}
-                </div>
-
-                <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">카테고리 태그</h3>
                   <div className="flex flex-wrap gap-2">
-                    {tags.map(tag => (
+                    {(isEditing && editData ? editData.tags : seminarData.tags).map(tag => (
                       <span key={tag} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                         <span className="mr-1">🏷️</span>{tag}
                         {canManage && isEditing && (
@@ -279,6 +582,7 @@ export default function SeminarDetailPage() {
                     ))}
                   </div>
                   {canManage && isEditing && (
+                    <>
                     <div className="mt-3 flex gap-2">
                       <input
                         value={newTag}
@@ -288,8 +592,6 @@ export default function SeminarDetailPage() {
                       />
                       <Button variant="outline" onClick={handleAddTag}>추가</Button>
                     </div>
-                  )}
-                  {canManage && isEditing && (
                     <div className="mt-2 flex gap-2 flex-wrap">
                       {categoryTags.map(ct => (
                         <button
@@ -299,33 +601,36 @@ export default function SeminarDetailPage() {
                         >#{ct}</button>
                       ))}
                     </div>
+                    </>
                   )}
                 </div>
               </div>
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">신청 방식</h3>
-                {canManage && isEditing ? (
+                {canManage && isEditing && editData ? (
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="radio"
-                        checked={applicationType === 'first_come'}
-                        onChange={() => setApplicationType('first_come')}
+                        checked={editData.applicationType === 'first_come'}
+                        onChange={() => setEditData(prev => prev ? { ...prev, applicationType: 'first_come' } : null)}
                       />
                       선착순
                     </label>
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="radio"
-                        checked={applicationType === 'selection'}
-                        onChange={() => setApplicationType('selection')}
+                        checked={editData.applicationType === 'selection'}
+                        onChange={() => setEditData(prev => prev ? { ...prev, applicationType: 'selection' } : null)}
                       />
                       선발제
                     </label>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">{applicationType === 'first_come' ? '선착순' : '선발제'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {seminarData.applicationType === 'first_come' ? '선착순' : '선발제'}
+                  </p>
                 )}
               </div>
             </div>
@@ -336,8 +641,25 @@ export default function SeminarDetailPage() {
                   <Button variant="outline" onClick={() => setIsEditing(true)}>정보 수정</Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button>저장</Button>
-                    <Button variant="outline" onClick={() => setIsEditing(false)}>취소</Button>
+                    <Button onClick={handleSave} disabled={saving}>
+                      {saving ? '저장 중...' : '저장'}
+                    </Button>
+                    <Button variant="outline" onClick={() => {
+                      setIsEditing(false);
+                      // Reset edit data
+                      setEditData({
+                        title: seminarData.title,
+                        description: seminarData.description,
+                        capacity: seminarData.capacity,
+                        location: seminarData.location || '',
+                        startDate: seminarData.startDate,
+                        endDate: seminarData.endDate || '',
+                        applicationStart: seminarData.applicationStart,
+                        applicationEnd: seminarData.applicationEnd,
+                        applicationType: seminarData.applicationType,
+                        tags: [...seminarData.tags]
+                      });
+                    }}>취소</Button>
                   </div>
                 )}
               </div>
@@ -349,11 +671,17 @@ export default function SeminarDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>회차별 관리</CardTitle>
-            <CardDescription>각 회차의 날짜, 주제, 학습 내용 기록</CardDescription>
+            <CardDescription>
+              각 회차의 날짜, 주제, 학습 내용 기록
+              <br />
+              <span className="text-xs text-muted-foreground">
+                💡 세미나 시작/종료 날짜는 세션 날짜에 따라 자동으로 계산됩니다
+              </span>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {sessions.map((s) => (
+              {seminarData.sessions.map((s) => (
                 <div key={s.id} className="border border-border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -363,7 +691,7 @@ export default function SeminarDetailPage() {
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">{s.description}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                        <span>📅 {s.date}</span>
+                        <span>📅 {new Date(s.date).toLocaleDateString()}</span>
                         <span>⏱️ {s.duration_minutes}분</span>
                         {s.location && <span>📍 {s.location}</span>}
                       </div>
@@ -371,14 +699,20 @@ export default function SeminarDetailPage() {
                     {canManage && (
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm">수정</Button>
-                        <Button variant="secondary" size="sm">삭제</Button>
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => handleDeleteSession(s.id)}
+                        >
+                          삭제
+                        </Button>
                       </div>
                     )}
                   </div>
                 </div>
               ))}
 
-              {sessions.length === 0 && (
+              {seminarData.sessions.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <span className="block text-6xl mb-4 opacity-30">📚</span>
                   <p>등록된 회차가 없습니다</p>
@@ -396,7 +730,7 @@ export default function SeminarDetailPage() {
                       className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                     <input
-                      type="date"
+                      type="datetime-local"
                       value={newSession.date}
                       onChange={e => setNewSession(v => ({ ...v, date: e.target.value }))}
                       className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
@@ -405,8 +739,8 @@ export default function SeminarDetailPage() {
                       type="number"
                       min={VALIDATION_RULES.session.minDurationMinutes}
                       max={VALIDATION_RULES.session.maxDurationMinutes}
-                      value={newSession.duration}
-                      onChange={e => setNewSession(v => ({ ...v, duration: Number(e.target.value) }))}
+                      value={newSession.duration_minutes}
+                      onChange={e => setNewSession(v => ({ ...v, duration_minutes: Number(e.target.value) }))}
                       className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                     <input
@@ -423,7 +757,12 @@ export default function SeminarDetailPage() {
                     />
                   </div>
                   <div className="mt-3">
-                    <Button onClick={handleAddSession}>회차 추가</Button>
+                    <Button 
+                      onClick={handleAddSession} 
+                      disabled={addingSession || !newSession.title || !newSession.date}
+                    >
+                      {addingSession ? '추가 중...' : '회차 추가'}
+                    </Button>
                   </div>
                 </div>
               )}

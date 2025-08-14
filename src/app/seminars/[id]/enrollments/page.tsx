@@ -1,18 +1,32 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 interface Applicant {
   id: string;
+  userId: string;
   name: string;
   email: string;
-  applied_at: string;
+  appliedAt: string;
   status: 'pending' | 'approved' | 'rejected';
+}
+
+interface EnrollmentData {
+  capacity: number;
+  stats: {
+    capacity: number;
+    total: number;
+    approved: number;
+    pending: number;
+    rejected: number;
+  };
+  enrollments: Applicant[];
 }
 
 export default function SeminarEnrollmentsPage() {
@@ -22,66 +36,221 @@ export default function SeminarEnrollmentsPage() {
   const { isAdmin, isSeminarLeader } = useAuth();
   const canManage = isAdmin || isSeminarLeader;
 
-  const [capacity, setCapacity] = useState(20);
-  const [applicants, setApplicants] = useState<Applicant[]>([
-    { id: 'u1', name: '김학생', email: 'kim@example.com', applied_at: '2025-01-10 10:00', status: 'approved' },
-    { id: 'u2', name: '박학생', email: 'park@example.com', applied_at: '2025-01-10 10:05', status: 'pending' },
-    { id: 'u3', name: '이학생', email: 'lee@example.com', applied_at: '2025-01-10 10:09', status: 'pending' },
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [enrollmentData, setEnrollmentData] = useState<EnrollmentData | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
 
-  const approvedCount = useMemo(() => applicants.filter(a => a.status === 'approved').length, [applicants]);
-  const capacityRate = Math.min((approvedCount / capacity) * 100, 100);
+  const loadEnrollments = async () => {
+    if (!id) return;
 
-  const approve = (uid: string) => {
-    if (!canManage) return;
-    setApplicants(prev => prev.map(a => a.id === uid ? { ...a, status: 'approved' } : a));
+    let mounted = true;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('Authentication required');
+      }
+
+      console.log('🔍 Loading enrollments for seminar:', id);
+
+      const response = await fetch(`/api/seminars/${id}/enrollments`, {
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!mounted) return;
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('권한이 없습니다. 세미나 담당자만 신청자를 관리할 수 있습니다.');
+        }
+        throw new Error('Failed to load enrollment data');
+      }
+
+      const data: EnrollmentData = await response.json();
+      
+      if (mounted) {
+        setEnrollmentData(data);
+        console.log('✅ Loaded enrollments:', data.enrollments.length, 'applications');
+      }
+
+    } catch (err) {
+      console.error('❌ Error loading enrollments:', err);
+      if (mounted) {
+        setError(err instanceof Error ? err.message : '신청자 정보를 불러오는데 실패했습니다.');
+      }
+    } finally {
+      if (mounted) {
+        setLoading(false);
+      }
+    }
+
+    return () => {
+      mounted = false;
+    };
   };
-  const reject = (uid: string) => {
-    if (!canManage) return;
-    setApplicants(prev => prev.map(a => a.id === uid ? { ...a, status: 'rejected' } : a));
+
+  const updateStatus = async (enrollmentId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    if (!canManage || !id) return;
+
+    let mounted = true;
+
+    try {
+      setUpdating(enrollmentId);
+
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('Authentication required');
+      }
+
+      console.log('🔄 Updating enrollment status:', enrollmentId, 'to', newStatus);
+
+      const response = await fetch(`/api/seminars/${id}/enrollments`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enrollmentId,
+          status: newStatus
+        }),
+      });
+
+      if (!mounted) return;
+
+      if (!response.ok) {
+        throw new Error('상태 변경에 실패했습니다.');
+      }
+
+      console.log('✅ Status updated successfully');
+      
+      // Reload data to reflect changes
+      if (mounted) {
+        await loadEnrollments();
+      }
+
+    } catch (err) {
+      console.error('❌ Error updating status:', err);
+      if (mounted) {
+        alert(err instanceof Error ? err.message : '상태 변경에 실패했습니다.');
+      }
+    } finally {
+      if (mounted) {
+        setUpdating(null);
+      }
+    }
+
+    return () => {
+      mounted = false;
+    };
   };
+
+  useEffect(() => {
+    loadEnrollments();
+  }, [id]);
+
+  const approve = (enrollmentId: string) => updateStatus(enrollmentId, 'approved');
+  const reject = (enrollmentId: string) => updateStatus(enrollmentId, 'rejected');
+
+  const applicants = enrollmentData?.enrollments || [];
+  const stats = enrollmentData?.stats || { capacity: 0, total: 0, approved: 0, pending: 0, rejected: 0 };
+  const capacity = enrollmentData?.capacity || 0;
+  const approvedCount = stats.approved;
+  const capacityRate = Math.min((approvedCount / Math.max(capacity, 1)) * 100, 100);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="space-y-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">신청자 정보를 불러오는 중...</p>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="space-y-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-red-600 mb-4">{error}</p>
+              <Button onClick={() => router.back()}>뒤로 가기</Button>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <div className="space-y-8">
+        
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">신청 관리</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push(`/seminars/${id}`)}>세미나로 돌아가기</Button>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">신청 관리</h1>
+            <p className="text-muted-foreground mt-1">세미나 신청자를 관리하고 승인/거절을 처리하세요</p>
           </div>
+          <Button variant="outline" onClick={() => router.back()}>
+            뒤로 가기
+          </Button>
         </div>
 
+        {/* Statistics */}
         <Card>
           <CardHeader>
-            <CardTitle>정원 및 현황</CardTitle>
-            <CardDescription>실시간 신청 현황</CardDescription>
+            <CardTitle>신청 현황</CardTitle>
+            <CardDescription>정원 대비 신청 및 승인 현황</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">승인 인원</span>
-                  <span className="font-medium">{approvedCount}/{capacity}명</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${approvedCount >= capacity ? 'bg-destructive' : 'bg-primary'}`}
-                    style={{ width: `${capacityRate}%` }}
-                  />
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="text-center p-4 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+                <div className="text-sm text-muted-foreground">총 신청자</div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">정원</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={capacity}
-                  onChange={(e) => setCapacity(Number(e.target.value))}
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+                <div className="text-sm text-green-600">승인</div>
+              </div>
+              
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+                <div className="text-sm text-yellow-600">대기</div>
+              </div>
+              
+              <div className="text-center p-4 bg-red-50 rounded-lg">
+                <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
+                <div className="text-sm text-red-600">거절</div>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">정원 대비 승인 현황</span>
+                <span className="font-medium">{approvedCount}/{capacity}명 ({capacityRate.toFixed(1)}%)</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-3">
+                <div
+                  className={`h-3 rounded-full transition-all duration-300 ${
+                    capacityRate >= 100 ? 'bg-red-500' : capacityRate >= 80 ? 'bg-yellow-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${capacityRate}%` }}
                 />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">선착순/선발제는 상세 페이지에서 변경 가능합니다.</p>
               </div>
             </div>
           </CardContent>
@@ -93,25 +262,55 @@ export default function SeminarEnrollmentsPage() {
             <CardDescription>대기/승인/거절 처리</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {applicants.map(a => (
-                <div key={a.id} className="border border-border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-foreground">{a.name}</div>
-                    <div className="text-sm text-muted-foreground">{a.email} · {a.applied_at}</div>
+            {applicants.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">아직 신청자가 없습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {applicants.map(a => (
+                  <div key={a.id} className="border border-border rounded-lg p-4 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-foreground">{a.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {a.email} · {new Date(a.appliedAt).toLocaleString('ko-KR')}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        a.status === 'approved' 
+                          ? 'bg-green-100 text-green-700' 
+                          : a.status === 'rejected' 
+                          ? 'bg-red-100 text-red-700' 
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {a.status === 'approved' ? '승인' : a.status === 'rejected' ? '거절' : '대기'}
+                      </span>
+                      {canManage && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => approve(a.id)}
+                            disabled={updating === a.id || a.status === 'approved'}
+                          >
+                            {updating === a.id ? '처리중...' : '승인'}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            onClick={() => reject(a.id)}
+                            disabled={updating === a.id || a.status === 'rejected'}
+                          >
+                            {updating === a.id ? '처리중...' : '거절'}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium bg-secondary ${a.status === 'approved' ? 'text-foreground' : a.status === 'rejected' ? 'text-destructive' : 'text-muted-foreground'}`}>{a.status}</span>
-                    {canManage && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => approve(a.id)}>승인</Button>
-                        <Button size="sm" variant="secondary" onClick={() => reject(a.id)}>거절</Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
