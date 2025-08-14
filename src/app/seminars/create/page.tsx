@@ -112,9 +112,11 @@ export default function CreateSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="2025-1">2025-1</option>
-                    <option value="2024-2">2024-2</option>
-                    <option value="2024-1">2024-1</option>
+                    <option value="2024-1">2024년 봄학기</option>
+                    <option value="2024-2">2024년 가을학기</option>
+                    <option value="2025-1">2025년 봄학기</option>
+                    <option value="2025-summer">2025년 여름학기</option>
+                    <option value="2025-fall">2025년 가을학기</option>
                   </select>
                 </div>
                 <div>

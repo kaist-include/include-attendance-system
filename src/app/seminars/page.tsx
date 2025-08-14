@@ -278,9 +278,9 @@ export default function SeminarsPage() {
                     <Clock className="w-4 h-4 mr-2" />
                     <span>총 {seminar.sessions}회차</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <Users className="w-4 h-4 mr-2" />
-                    <span>학기: {seminar.semester}</span>
+                    <span>학기: <span className="font-medium text-foreground/90">{seminar.semester}</span></span>
                   </div>
                 </div>
 
@@ -325,9 +325,11 @@ export default function SeminarsPage() {
                     </Button>
                   </Link>
                   {user && seminar.status === 'recruiting' && seminar.enrolled < seminar.capacity && (
-                    <Button className="flex-1">
-                      신청하기
-                    </Button>
+                    <Link href={ROUTES.applySeminar(seminar.id.toString())} className="flex-1">
+                      <Button className="w-full">
+                        신청하기
+                      </Button>
+                    </Link>
                   )}
                   {user && seminar.status === 'recruiting' && seminar.enrolled >= seminar.capacity && (
                     <Button variant="secondary" className="flex-1" disabled>
