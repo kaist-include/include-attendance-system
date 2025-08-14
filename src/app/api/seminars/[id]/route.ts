@@ -110,6 +110,26 @@ export async function GET(
       console.error('❌ Error fetching enrollment info:', enrollmentError);
     }
 
+    // Check current user's enrollment status if authenticated
+    let currentUserEnrollment = null;
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      if (token) {
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (!authError && user) {
+          // Find current user's enrollment
+          const userEnrollment = enrollments.find(e => e.user_id === user.id);
+          if (userEnrollment) {
+            currentUserEnrollment = {
+              status: userEnrollment.status,
+              applied_at: userEnrollment.applied_at
+            };
+          }
+        }
+      }
+    }
+
     // Transform the data to match frontend expectations
     const transformedSeminar = {
       id: seminar.id,
@@ -138,6 +158,7 @@ export async function GET(
         pending: enrollments.filter(e => e.status === 'pending').length || 0,
         rejected: enrollments.filter(e => e.status === 'rejected').length || 0
       },
+      currentUserEnrollment,
       sessions: seminar.sessions?.sort((a, b) => a.session_number - b.session_number) || [],
       createdAt: seminar.created_at,
       updatedAt: seminar.updated_at

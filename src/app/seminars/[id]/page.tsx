@@ -44,6 +44,10 @@ interface SeminarData {
     pending: number;
     rejected: number;
   };
+  currentUserEnrollment: {
+    status: 'pending' | 'approved' | 'rejected';
+    applied_at: string;
+  } | null;
   sessions: Session[];
   createdAt: string;
   updatedAt: string;
@@ -423,11 +427,28 @@ export default function SeminarDetailPage() {
           </div>
           <div className="mt-4 md:mt-0 flex gap-2">
             <Button variant="outline" onClick={() => router.push(ROUTES.seminars)}>목록으로</Button>
-            <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>신청 관리</Button>
-            <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>출석 관리</Button>
-            {seminarData.enrollments.approved < seminarData.capacity ? (
+            {canManage && (
+              <>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>신청 관리</Button>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>출석 관리</Button>
+              </>
+            )}
+            {!user ? (
+              <Button onClick={handleEnroll}>신청하기</Button>
+            ) : seminarData.currentUserEnrollment ? (
+              // 이미 신청한 사용자
+              seminarData.currentUserEnrollment.status === 'pending' ? (
+                <Button variant="secondary" disabled>신청중</Button>
+              ) : seminarData.currentUserEnrollment.status === 'approved' ? (
+                <Button variant="outline" disabled>수강중</Button>
+              ) : (
+                <Button variant="destructive" disabled>신청 거절</Button>
+              )
+            ) : seminarData.enrollments.approved < seminarData.capacity ? (
+              // 신청하지 않았고 정원이 남은 경우
               <Button onClick={handleEnroll}>신청하기</Button>
             ) : (
+              // 정원 마감
               <Button variant="secondary" disabled>정원 마감</Button>
             )}
           </div>
