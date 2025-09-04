@@ -85,9 +85,9 @@ export async function GET(
     const attendanceList = users.map((user: any) => {
       const attendance = attendances?.find((a: any) => a.user_id === user.id);
       return {
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
+        id: user.id, // Use 'id' for React key prop
+        name: user.name,
+        email: user.email,
         status: attendance?.status || 'absent',
         checkedAt: attendance?.checked_at,
         checkedBy: attendance?.checked_by,
@@ -98,13 +98,14 @@ export async function GET(
     return NextResponse.json({
       session: {
         id: session.id,
+        sessionNumber: session.session_number,
         title: session.title,
         description: session.description,
         date: session.date,
         location: session.location,
         seminar: session.seminars
       },
-      attendance: attendanceList
+      attendees: attendanceList
     });
 
   } catch (error) {

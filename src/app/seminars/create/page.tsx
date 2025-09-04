@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
+import { getAvailableSemesters, getDefaultSemester } from '@/lib/utils';
 
 export default function CreateSeminarPage() {
   const { user } = useRequireAuth();
@@ -14,7 +15,7 @@ export default function CreateSeminarPage() {
     title: '',
     description: '',
     capacity: DEFAULTS.seminarCapacity as number,
-    semester: '2025-1',
+    semester: getDefaultSemester(),
     start_date: '',
     end_date: '',
     application_start: '',
@@ -146,11 +147,11 @@ export default function CreateSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="2024-1">2024년 봄학기</option>
-                    <option value="2024-2">2024년 가을학기</option>
-                    <option value="2025-1">2025년 봄학기</option>
-                    <option value="2025-summer">2025년 여름학기</option>
-                    <option value="2025-fall">2025년 가을학기</option>
+                    {getAvailableSemesters().map((semesterOption) => (
+                      <option key={semesterOption.value} value={semesterOption.value}>
+                        {semesterOption.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

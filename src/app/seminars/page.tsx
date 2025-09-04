@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/config/constants';
 import { createClient } from '@/utils/supabase/client';
+import { formatSemesterLabel } from '@/lib/utils';
 
 interface Seminar {
   id: string;
@@ -215,11 +216,11 @@ export default function SeminarsPage() {
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
                   >
-                    <option value="all">모든 상태</option>
-                    <option value="draft">준비중</option>
-                    <option value="in_progress">진행중</option>
-                    <option value="completed">완료</option>
-                    <option value="cancelled">취소</option>
+                    <option key="all-status" value="all">모든 상태</option>
+                    <option key="draft" value="draft">준비중</option>
+                    <option key="in_progress" value="in_progress">진행중</option>
+                    <option key="completed" value="completed">완료</option>
+                    <option key="cancelled" value="cancelled">취소</option>
                   </select>
                 </div>
 
@@ -231,7 +232,7 @@ export default function SeminarsPage() {
                     onChange={(e) => setSemesterFilter(e.target.value)}
                     className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
                   >
-                    <option value="all">모든 학기</option>
+                    <option key="all-semester" value="all">모든 학기</option>
                     {allSemesters.map(sem => (
                       <option key={sem} value={sem}>{sem}</option>
                     ))}
@@ -309,7 +310,7 @@ export default function SeminarsPage() {
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Users className="w-4 h-4 mr-2" />
-                    <span>학기: <span className="font-medium text-foreground/90">{seminar.semester}</span></span>
+                    <span>학기: <span className="font-medium text-foreground/90">{formatSemesterLabel(seminar.semester)}</span></span>
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <GraduationCap className="w-4 h-4 mr-2" />

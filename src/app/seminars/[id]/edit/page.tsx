@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
-import { useAuth, useRequireRole } from '@/hooks/useAuth';
+import { getAvailableSemesters, formatSemesterLabel } from '@/lib/utils';
 
 export default function EditSeminarPage() {
   // No role requirement - ownership will be checked via API
@@ -110,11 +111,11 @@ export default function EditSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="2024-1">2024년 봄학기</option>
-                    <option value="2024-2">2024년 가을학기</option>
-                    <option value="2025-1">2025년 봄학기</option>
-                    <option value="2025-summer">2025년 여름학기</option>
-                    <option value="2025-fall">2025년 가을학기</option>
+                    {getAvailableSemesters().map((semesterOption) => (
+                      <option key={semesterOption.value} value={semesterOption.value}>
+                        {semesterOption.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

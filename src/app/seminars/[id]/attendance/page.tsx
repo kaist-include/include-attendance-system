@@ -87,7 +87,7 @@ export default function SeminarAttendancePage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Common state
   const [loading, setLoading] = useState(true);
@@ -105,13 +105,25 @@ export default function SeminarAttendancePage() {
   
   // QR Code state
   const [qrUrl, setQrUrl] = useState<string>('');
+  const [numericCode, setNumericCode] = useState<string>('');
   const [expiresAt, setExpiresAt] = useState<number>(0);
   const [generatingQr, setGeneratingQr] = useState(false);
   
-  // Member QR scan state
-  const [qrInput, setQrInput] = useState<string>('');
+  // Member attendance input state
+  const [qrInput, setQrInput] = useState('');
+  const [numericInput, setNumericInput] = useState('');
   const [scanningQr, setScanningQr] = useState(false);
-  const [scanMessage, setScanMessage] = useState<string>('');
+  const [scanMessage, setScanMessage] = useState('');
+  
+  // Manager numeric code visibility state
+  const [showNumericCode, setShowNumericCode] = useState(false);
+  
+  // Reset numeric code visibility when QR code changes
+  useEffect(() => {
+    setShowNumericCode(false);
+  }, [qrUrl, numericCode]);
+  
+
   
   // Update states
   const [updatingAttendance, setUpdatingAttendance] = useState<string | null>(null);
@@ -120,7 +132,7 @@ export default function SeminarAttendancePage() {
 
   // Determine user role and load appropriate data
   useEffect(() => {
-    if (!id) return;
+    if (!id || authLoading || !user?.id) return;
 
     let mounted = true;
 
@@ -128,15 +140,9 @@ export default function SeminarAttendancePage() {
       try {
         setLoading(true);
         setError(null);
-        
-        if (!user?.id) {
-          throw new Error('Authentication required');
-        }
 
-        console.log('🔍 Checking user role for attendance access');
-
-        // First, try to access manager API - auth handled by middleware
-        const managerResponse = await fetch(`/api/seminars/${id}/attendance`, {
+        // Check user role to determine which API to call
+        const roleResponse = await fetch(`/api/seminars/${id}/check-role`, {
           headers: {
             'Content-Type': 'application/json',
           },
@@ -144,45 +150,56 @@ export default function SeminarAttendancePage() {
 
         if (!mounted) return;
 
-        if (managerResponse.ok) {
-          // User is a manager
-          console.log('✅ User is a manager - loading manager interface');
-          const data: AttendanceData = await managerResponse.json();
-          setAttendanceData(data);
-          setIsManager(true);
-          
-          // Set first session as default if available and no session is selected
-          if (data.sessions.length > 0 && !selectedSessionId) {
-            setSelectedSessionId(data.sessions[0].id);
-          }
-        } else if (managerResponse.status === 403) {
-          // User is not a manager, try member API
-          console.log('👤 User is not a manager - trying member access');
-          const memberResponse = await fetch(`/api/seminars/${id}/my-attendance`, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
+        if (roleResponse.ok) {
+          const roleData = await roleResponse.json();
+          const isUserManager = roleData.isManager;
 
-          if (!mounted) return;
+          if (isUserManager) {
+            // Load manager interface
+            const managerResponse = await fetch(`/api/seminars/${id}/attendance`, {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
 
-          if (memberResponse.ok) {
-            console.log('✅ User is an enrolled member - loading member interface');
-            const data: MemberAttendanceData = await memberResponse.json();
-            setMemberData(data);
-            setIsManager(false);
+            if (managerResponse.ok) {
+              const data: AttendanceData = await managerResponse.json();
+              setAttendanceData(data);
+              setIsManager(true);
+              
+              // Set first session as default if available and no session is selected
+              if (data.sessions && data.sessions.length > 0 && !selectedSessionId) {
+                setSelectedSessionId(data.sessions[0].id);
+              }
+            } else {
+              const errorData = await managerResponse.json().catch(() => ({ error: 'Failed to load manager data' }));
+              throw new Error(`Manager API error: ${errorData.error}`);
+            }
           } else {
-            const errorData = await memberResponse.json().catch(() => ({ error: 'Access denied' }));
-            throw new Error(`Access denied: ${errorData.error}`);
+            // Load member interface
+            const memberResponse = await fetch(`/api/seminars/${id}/my-attendance`, {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (!mounted) return;
+
+            if (memberResponse.ok) {
+              const data: MemberAttendanceData = await memberResponse.json();
+              setMemberData(data);
+              setIsManager(false);
+            } else {
+              const errorData = await memberResponse.json().catch(() => ({ error: 'Access denied' }));
+              throw new Error(`Access denied: ${errorData.error}`);
+            }
           }
         } else {
-          const errorData = await managerResponse.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(`Failed to load data: ${errorData.error}`);
+          throw new Error('Failed to check user role');
         }
       } catch (err) {
         if (mounted) {
           setError(err instanceof Error ? err.message : 'An error occurred');
-          console.error('Error loading attendance data:', err);
         }
       } finally {
         if (mounted) {
@@ -197,20 +214,16 @@ export default function SeminarAttendancePage() {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]); // Removed selectedSessionId and user?.id from dependencies to prevent infinite loop
+  }, [id, authLoading, user?.id]); // Wait for auth to complete
 
   // Load specific session attendance (manager only)
   useEffect(() => {
-    if (!selectedSessionId || !attendanceData || !isManager) return;
+    if (!selectedSessionId || !attendanceData || !isManager || authLoading || !user?.id) return;
 
     let mounted = true;
 
     const loadSessionAttendance = async () => {
       try {
-        if (!user?.id) {
-          throw new Error('Authentication required');
-        }
-
         console.log('🔍 Loading session attendance for:', selectedSessionId);
         
         const response = await fetch(`/api/seminars/${id}/attendance/${selectedSessionId}`, {
@@ -249,18 +262,15 @@ export default function SeminarAttendancePage() {
     return () => {
       mounted = false;
     };
-  }, [selectedSessionId, id, attendanceData, isManager, user?.id]);
+  }, [selectedSessionId, id, attendanceData, isManager, authLoading, user?.id]);
 
   // Generate QR Code (manager only)
   const generateQr = useCallback(async () => {
-    if (!selectedSessionId || !isManager) return;
+    if (!selectedSessionId || !isManager || authLoading || !user?.id) return;
 
     try {
       setGeneratingQr(true);
-      
-      if (!user?.id) {
-        throw new Error('Authentication required');
-      }
+      setError(null); // Clear any previous errors
 
       const response = await fetch(`/api/seminars/${id}/attendance/qr`, {
         method: 'POST',
@@ -271,33 +281,44 @@ export default function SeminarAttendancePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate QR code');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to generate QR code');
       }
 
-      const { qrData, expiresAt: expiry } = await response.json();
+      const { qrData, numericCode: code, expiresAt: expiry } = await response.json();
+      
+      if (!qrData || !expiry) {
+        throw new Error('Invalid QR code response from server');
+      }
       
       // Generate QR code image
-      const dataUrl = await QRCode.toDataURL(qrData, { width: 256 });
+      const dataUrl = await QRCode.toDataURL(qrData, { 
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
       setQrUrl(dataUrl);
+      setNumericCode(code || '');
       setExpiresAt(new Date(expiry).getTime());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate QR code');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate QR code';
+      setError(errorMessage);
       console.error('Error generating QR code:', err);
     } finally {
       setGeneratingQr(false);
     }
-  }, [selectedSessionId, isManager, user?.id, id]);
+  }, [selectedSessionId, isManager, authLoading, user?.id, id]);
 
   // Update attendance status (manager only)
   const setStatus = async (userId: string, status: Attendee['status']) => {
-    if (!selectedSessionId || !isManager) return;
+    if (!selectedSessionId || !isManager || authLoading || !user?.id) return;
 
     try {
       setUpdatingAttendance(userId);
-      
-      if (!user?.id) {
-        throw new Error('Authentication required');
-      }
+      setError(null); // Clear any previous errors
 
       const response = await fetch(`/api/seminars/${id}/attendance/${selectedSessionId}`, {
         method: 'PUT',
@@ -308,7 +329,8 @@ export default function SeminarAttendancePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update attendance');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to update attendance');
       }
 
       // Update local state
@@ -318,31 +340,31 @@ export default function SeminarAttendancePage() {
           : a
       ));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update attendance');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update attendance';
+      setError(errorMessage);
       console.error('Error updating attendance:', err);
     } finally {
       setUpdatingAttendance(null);
     }
   };
 
-  // Handle QR scan (member only)
+  // Handle QR scan or numeric code (member only)
   const handleQrScan = async () => {
-    if (!qrInput.trim() || scanningQr) return;
+    if ((!qrInput.trim() && !numericInput.trim()) || scanningQr || authLoading || !user?.id) return;
 
     try {
       setScanningQr(true);
       setScanMessage('');
-      
-      if (!user?.id) {
-        throw new Error('Authentication required');
-      }
 
       const response = await fetch(`/api/seminars/${id}/attendance/qr`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ qrData: qrInput.trim() }),
+        body: JSON.stringify({ 
+          qrData: qrInput.trim() || null, 
+          numericCode: numericInput.trim() || null 
+        }),
       });
 
       const result = await response.json();
@@ -350,6 +372,7 @@ export default function SeminarAttendancePage() {
       if (response.ok) {
         setScanMessage('✅ 출석이 성공적으로 처리되었습니다!');
         setQrInput('');
+        setNumericInput('');
         // Refresh member data to show updated attendance
         setTimeout(() => {
           window.location.reload();
@@ -378,7 +401,7 @@ export default function SeminarAttendancePage() {
 
   // Auto-refresh QR code when expired (manager only)
   useEffect(() => {
-    if (!expiresAt || !selectedSessionId || !isManager) return;
+    if (!expiresAt || !selectedSessionId || !isManager || authLoading || !user?.id) return;
     
     const timer = setInterval(() => {
       if (Date.now() >= expiresAt) {
@@ -387,18 +410,18 @@ export default function SeminarAttendancePage() {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [expiresAt, selectedSessionId, isManager, generateQr]);
+  }, [expiresAt, selectedSessionId, isManager, authLoading, user?.id, generateQr]);
 
   // Generate QR on session change (manager only)
   useEffect(() => {
-    if (selectedSessionId && isManager) {
+    if (selectedSessionId && isManager && !authLoading && user?.id) {
       generateQr();
     }
-  }, [selectedSessionId, isManager, generateQr]);
+  }, [selectedSessionId, isManager, authLoading, user?.id, generateQr]);
 
   // Calculate statistics (manager only)
   const managerStats = useMemo(() => {
-    if (!isManager) return null;
+    if (!isManager || !attendees) return null;
     const total = attendees.length;
     const present = attendees.filter(a => a.status === 'present').length;
     const late = attendees.filter(a => a.status === 'late').length;
@@ -415,7 +438,7 @@ export default function SeminarAttendancePage() {
   }, [attendees, isManager]);
 
   // Loading state
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-96">
@@ -443,14 +466,16 @@ export default function SeminarAttendancePage() {
   }
 
   // Member UI
-  if (isManager === false && memberData) {
+  const shouldShowMemberUI = isManager === false && !!memberData && !!memberData.seminar && !!memberData.statistics;
+
+  if (shouldShowMemberUI) {
   return (
     <MainLayout>
       <div className="space-y-8">
         <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground">내 출석 현황</h1>
-              <p className="text-muted-foreground">{memberData.seminar.title}</p>
+              <p className="text-muted-foreground">{memberData?.seminar?.title || '세미나'}</p>
             </div>
           <div className="flex gap-2">
               <Button variant="outline" onClick={() => router.push(`/seminars/${id}`)}>
@@ -469,27 +494,27 @@ export default function SeminarAttendancePage() {
               <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
                 <div>
                   <div className="text-sm text-muted-foreground">총 세션</div>
-                  <div className="text-2xl font-bold text-foreground">{memberData.statistics.total}</div>
+                  <div className="text-2xl font-bold text-foreground">{memberData?.statistics?.total || 0}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">출석</div>
-                  <div className="text-2xl font-bold text-green-600">{memberData.statistics.present}</div>
+                  <div className="text-2xl font-bold text-green-600">{memberData?.statistics?.present || 0}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">지각</div>
-                  <div className="text-2xl font-bold text-yellow-600">{memberData.statistics.late}</div>
+                  <div className="text-2xl font-bold text-yellow-600">{memberData?.statistics?.late || 0}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">공결</div>
-                  <div className="text-2xl font-bold text-blue-600">{memberData.statistics.excused}</div>
+                  <div className="text-2xl font-bold text-blue-600">{memberData?.statistics?.excused || 0}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">결석</div>
-                  <div className="text-2xl font-bold text-red-600">{memberData.statistics.absent}</div>
+                  <div className="text-2xl font-bold text-red-600">{memberData?.statistics?.absent || 0}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">출석률</div>
-                  <div className="text-2xl font-bold text-foreground">{memberData.statistics.attendanceRate}%</div>
+                  <div className="text-2xl font-bold text-foreground">{memberData?.statistics?.attendanceRate || 0}%</div>
                 </div>
               </div>
             </CardContent>
@@ -498,29 +523,50 @@ export default function SeminarAttendancePage() {
           {/* Member QR Scan */}
           <Card>
             <CardHeader>
-              <CardTitle>QR 코드로 출석하기</CardTitle>
-              <CardDescription>관리자가 제공한 QR 코드를 스캔하거나 입력하여 출석 체크하세요</CardDescription>
+              <CardTitle>📱 출석하기</CardTitle>
+              <CardDescription>스마트폰으로 QR 코드를 스캔하거나 6자리 숫자 코드를 입력하세요</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="max-w-md">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={qrInput}
-                    onChange={(e) => setQrInput(e.target.value)}
-                    placeholder="QR 코드 데이터를 입력하세요"
-                    className="flex-1 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={scanningQr}
-                  />
-                  <Button 
-                    onClick={handleQrScan}
-                    disabled={!qrInput.trim() || scanningQr}
-                  >
-                    {scanningQr ? '처리 중...' : '출석 체크'}
-                  </Button>
+              <div className="max-w-md space-y-6">
+                {/* QR Scan Instructions */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="text-center space-y-2">
+                    <div className="text-2xl">📱</div>
+                    <h3 className="font-medium text-blue-900 dark:text-blue-100">스마트폰으로 QR 스캔</h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      관리자 화면의 QR 코드를 스캔하면<br/>
+                      자동으로 출석 처리됩니다!
+                    </p>
+                  </div>
                 </div>
+                
+                {/* Numeric Code Input */}
+                <div className="text-center">
+                  <div className="mb-4">
+                    <div className="text-lg font-medium text-foreground mb-2">또는 6자리 코드 입력</div>
+                    <div className="flex justify-center gap-2">
+                      <input
+                        type="text"
+                        value={numericInput}
+                        onChange={(e) => setNumericInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="123456"
+                        className="w-40 px-4 py-3 rounded-lg border-2 border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring text-center font-mono text-2xl tracking-widest"
+                        disabled={scanningQr}
+                        maxLength={6}
+                      />
+                      <Button 
+                        onClick={handleQrScan}
+                        disabled={numericInput.length !== 6 || scanningQr}
+                        size="lg"
+                      >
+                        {scanningQr ? '처리 중...' : '출석!'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 {scanMessage && (
-                  <div className={`mt-3 p-3 rounded-lg text-sm ${
+                  <div className={`p-4 rounded-lg text-sm text-center ${
                     scanMessage.includes('✅') 
                       ? 'bg-green-50 text-green-800 border border-green-200' 
                       : 'bg-red-50 text-red-800 border border-red-200'
@@ -528,8 +574,9 @@ export default function SeminarAttendancePage() {
                     {scanMessage}
                   </div>
                 )}
-                <div className="mt-3 text-xs text-muted-foreground">
-                  💡 팁: 관리자가 화면에 표시한 QR 코드를 스마트폰으로 스캔하거나, QR 코드 텍스트를 복사해서 위 입력창에 붙여넣으세요.
+                
+                <div className="text-xs text-muted-foreground text-center">
+                  💡 QR 스캔이 더 빠르고 편리합니다!
                 </div>
               </div>
             </CardContent>
@@ -543,7 +590,7 @@ export default function SeminarAttendancePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {memberData.sessions.length === 0 ? (
+                {!memberData?.sessions || memberData.sessions.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <span className="block text-6xl mb-4 opacity-30">📚</span>
                     <p>등록된 세션이 없습니다</p>
@@ -595,14 +642,14 @@ export default function SeminarAttendancePage() {
   }
 
   // Manager UI (existing functionality)
-  if (isManager === true && attendanceData) {
+  if (isManager === true && attendanceData && attendanceData.seminar) {
     return (
       <MainLayout>
         <div className="space-y-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground">출석 관리</h1>
-              <p className="text-muted-foreground">{attendanceData.seminar.title}</p>
+              <p className="text-muted-foreground">{attendanceData?.seminar?.title || '세미나'}</p>
               <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                 관리자 모드
               </span>
@@ -629,32 +676,105 @@ export default function SeminarAttendancePage() {
                   onChange={e => setSelectedSessionId(e.target.value)}
                   className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                    {attendanceData.sessions.map(s => (
+                    {attendanceData?.sessions?.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.sessionNumber}회차 · {s.title} · {new Date(s.date).toLocaleDateString()}
                       </option>
-                  ))}
+                    )) || (
+                      <option key="loading" value="">세션 로딩 중...</option>
+                    )}
                 </select>
               </div>
               <div className="md:col-span-2 flex flex-col items-center justify-center">
-                  {qrUrl ? (
-                  <Image src={qrUrl} alt="attendance qr" className="w-64 h-64" />
+                  {error && error.includes('QR') ? (
+                    <>
+                      <div className="w-64 h-64 flex flex-col items-center justify-center border-2 border-dashed border-red-300 rounded bg-red-50 dark:bg-red-900/20">
+                        <span className="text-red-600 dark:text-red-400 text-center text-sm px-4">
+                          {error}
+                        </span>
+                        <Button 
+                          className="mt-4" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={generateQr}
+                          disabled={generatingQr || authLoading}
+                        >
+                          다시 시도
+                        </Button>
+                      </div>
+                      <Button 
+                        className="mt-2" 
+                        variant="outline" 
+                        onClick={generateQr}
+                        disabled={generatingQr || authLoading || !selectedSessionId}
+                      >
+                        {generatingQr ? 'QR 생성 중...' : 'QR 갱신'}
+                      </Button>
+                    </>
+                  ) : qrUrl ? (
+                    <>
+                      <Image src={qrUrl} alt="attendance qr" width={256} height={256} className="w-64 h-64" />
+                      <div className="mt-4 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          유효 시간: {remainingSeconds}초
+                        </p>
+                        {numericCode && (
+                          <div className="mt-3 p-4 bg-muted rounded-lg border border-border">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs text-muted-foreground">6자리 출석 코드:</p>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setShowNumericCode(!showNumericCode)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                {showNumericCode ? '숨기기' : '보기'}
+                              </Button>
+                            </div>
+                            {showNumericCode ? (
+                              <p className="text-3xl font-mono font-bold text-foreground tracking-wider">
+                                {numericCode}
+                              </p>
+                            ) : (
+                              <div 
+                                className="text-3xl font-mono font-bold text-muted-foreground tracking-wider cursor-pointer select-none"
+                                onClick={() => setShowNumericCode(true)}
+                              >
+                                ••••••
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-2 opacity-70">
+                              💡 QR 스캔을 권장합니다. 숫자 코드는 필요시에만 사용하세요.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <Button 
+                        className="mt-2" 
+                        variant="outline" 
+                        onClick={generateQr}
+                        disabled={generatingQr || authLoading || !selectedSessionId}
+                      >
+                        {generatingQr ? 'QR 생성 중...' : 'QR 갱신'}
+                      </Button>
+                    </>
                   ) : (
-                    <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted-foreground rounded">
-                      <span className="text-muted-foreground">QR 코드 생성 중...</span>
-                    </div>
-                )}
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    유효 시간: {remainingSeconds}초
-                  </p>
-                  <Button 
-                    className="mt-2" 
-                    variant="outline" 
-                    onClick={generateQr}
-                    disabled={generatingQr}
-                  >
-                    {generatingQr ? 'QR 생성 중...' : 'QR 갱신'}
-                  </Button>
+                    <>
+                      <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted-foreground rounded">
+                        <span className="text-muted-foreground">
+                          {generatingQr ? 'QR 코드 생성 중...' : 'QR 코드를 생성하세요'}
+                        </span>
+                      </div>
+                      <Button 
+                        className="mt-2" 
+                        variant="outline" 
+                        onClick={generateQr}
+                        disabled={generatingQr || authLoading || !selectedSessionId}
+                      >
+                        {generatingQr ? 'QR 생성 중...' : 'QR 갱신'}
+                      </Button>
+                    </>
+                  )}
               </div>
             </div>
           </CardContent>
@@ -672,33 +792,33 @@ export default function SeminarAttendancePage() {
               </CardDescription>
           </CardHeader>
           <CardContent>
-              {managerStats && (
+              {managerStats && attendees && (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-6">
               <div>
                 <div className="text-sm text-muted-foreground">총원</div>
-                    <div className="text-2xl font-bold text-foreground">{managerStats.total}</div>
+                    <div className="text-2xl font-bold text-foreground">{managerStats?.total || 0}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">출석</div>
-                    <div className="text-2xl font-bold text-green-600">{managerStats.present}</div>
+                    <div className="text-2xl font-bold text-green-600">{managerStats?.present || 0}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">지각</div>
-                    <div className="text-2xl font-bold text-yellow-600">{managerStats.late}</div>
+                    <div className="text-2xl font-bold text-yellow-600">{managerStats?.late || 0}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">공결</div>
-                    <div className="text-2xl font-bold text-blue-600">{managerStats.excused}</div>
+                    <div className="text-2xl font-bold text-blue-600">{managerStats?.excused || 0}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">출석률</div>
-                    <div className="text-2xl font-bold text-foreground">{managerStats.rate}%</div>
+                    <div className="text-2xl font-bold text-foreground">{managerStats?.rate || 0}%</div>
               </div>
             </div>
               )}
 
               <div className="space-y-3">
-                {attendees.length === 0 ? (
+                {!attendees || attendees.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <span className="block text-6xl mb-4 opacity-30">👥</span>
                     <p>등록된 학생이 없습니다</p>

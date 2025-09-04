@@ -10,7 +10,6 @@ import { DEFAULTS, DATE_CONFIG, ROUTES, VALIDATION_RULES } from '@/config/consta
 import type { ApplicationType, Session } from '@/types';
 import { createClient } from '@/utils/supabase/client';
 
-const semesterOptions = ['2025-1', '2024-2', '2024-1', '2023-2'];
 const categoryTags = ['기초', '백엔드', '프론트엔드', 'AI'];
 
 interface SeminarData {
@@ -169,8 +168,8 @@ export default function SeminarDetailPage() {
       // With SSR pattern, authentication is handled automatically by middleware
       const response = await fetch(`/api/seminars/${id}`, {
         headers: {
-        'Content-Type': 'application/json',
-      }
+          'Content-Type': 'application/json',
+        },
       });
       
       if (!response.ok) {
@@ -416,6 +415,12 @@ export default function SeminarDetailPage() {
                 <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>신청 관리</Button>
                 <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>출석 관리</Button>
               </>
+            )}
+            {/* Show attendance button for enrolled members */}
+            {user && seminarData.currentUserEnrollment?.status === 'approved' && !canManage && (
+              <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>
+                📊 내 출석 현황
+              </Button>
             )}
             {!user ? (
               <Button onClick={handleEnroll}>신청하기</Button>

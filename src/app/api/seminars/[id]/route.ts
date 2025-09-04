@@ -11,6 +11,9 @@ export async function GET(
 
     // Create client - authentication is optional for this endpoint
     const supabase = await createClient();
+    
+    // Get current user (if authenticated) to check enrollment status
+    const { data: { user } } = await supabase.auth.getUser();
 
     // Fetch seminar with all related data
     const { data: seminar, error } = await supabase
@@ -100,6 +103,9 @@ export async function GET(
       sessions: seminar.sessions?.sort((a: any, b: any) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       ) || [],
+      
+      // Add current user enrollment status if user is authenticated
+      currentUserEnrollment: user ? seminar.enrollments?.find((e: any) => e.user_id === user.id) || null : null,
     };
 
     // Remove the nested objects we've already transformed

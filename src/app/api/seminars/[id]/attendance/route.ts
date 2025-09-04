@@ -172,7 +172,10 @@ export async function GET(
         id: seminarId,
         title: seminar.title
       },
-      sessions: sessions || [],
+      sessions: sessions?.map(session => ({
+        ...session,
+        sessionNumber: session.session_number
+      })) || [],
       users: users,
       attendances: attendanceMap
     };
