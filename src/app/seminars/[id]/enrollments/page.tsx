@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
+import { useRequireAuth } from '@/hooks/useAuth';
 import { createClient } from '@/utils/supabase/client';
 
 interface Applicant {
@@ -33,7 +33,7 @@ export default function SeminarEnrollmentsPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const { user, isAdmin } = useAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   // canManage will be determined by API ownership check
 
   const [loading, setLoading] = useState(true);
@@ -42,17 +42,13 @@ export default function SeminarEnrollmentsPage() {
   const [updating, setUpdating] = useState<string | null>(null);
 
   const loadEnrollments = useCallback(async () => {
-    if (!id) return;
+    if (!id || !user?.id || authLoading) return;
 
     let mounted = true;
 
     try {
       setLoading(true);
       setError(null);
-
-      if (!user?.id) {
-        throw new Error('Authentication required');
-      }
 
       console.log('🔍 Loading enrollments for seminar:', id);
 
@@ -93,19 +89,15 @@ export default function SeminarEnrollmentsPage() {
     return () => {
       mounted = false;
     };
-  }, [id, user?.id]);
+  }, [id, user?.id, authLoading]);
 
   const updateStatus = async (enrollmentId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
-    if (!id) return;
+    if (!id || !user?.id || authLoading) return;
 
     let mounted = true;
 
     try {
       setUpdating(enrollmentId);
-
-      if (!user?.id) {
-        throw new Error('Authentication required');
-      }
 
       console.log('🔄 Updating enrollment status:', enrollmentId, 'to', newStatus);
 
@@ -116,8 +108,8 @@ export default function SeminarEnrollmentsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          enrollmentId,
-          status: newStatus
+          action: newStatus === 'approved' ? 'approve' : 'reject',
+          enrollmentId
         }),
       });
 
@@ -151,8 +143,10 @@ export default function SeminarEnrollmentsPage() {
   };
 
   useEffect(() => {
-    loadEnrollments();
-  }, [id, loadEnrollments]);
+    if (!authLoading && user?.id) {
+      loadEnrollments();
+    }
+  }, [loadEnrollments, authLoading, user?.id]);
 
   const approve = (enrollmentId: string) => updateStatus(enrollmentId, 'approved');
   const reject = (enrollmentId: string) => updateStatus(enrollmentId, 'rejected');
@@ -163,7 +157,7 @@ export default function SeminarEnrollmentsPage() {
   const approvedCount = stats.approved;
   const capacityRate = Math.min((approvedCount / Math.max(capacity, 1)) * 100, 100);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <MainLayout>
         <div className="space-y-8">
@@ -284,22 +278,32 @@ export default function SeminarEnrollmentsPage() {
                       }`}>
                         {a.status === 'approved' ? '승인' : a.status === 'rejected' ? '거절' : '대기'}
                       </span>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => approve(a.id)}
-                        disabled={updating === a.id || a.status === 'approved'}
-                      >
-                        {updating === a.id ? '처리중...' : '승인'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        onClick={() => reject(a.id)}
-                        disabled={updating === a.id || a.status === 'rejected'}
-                      >
-                        {updating === a.id ? '처리중...' : '거절'}
-                      </Button>
+                      
+                      {/* Show owner badge instead of action buttons for self-enrollment */}
+                      {a.userId === user?.id ? (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          개설자
+                        </span>
+                      ) : (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => approve(a.id)}
+                            disabled={updating === a.id || a.status === 'approved'}
+                          >
+                            {updating === a.id ? '처리중...' : '승인'}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            onClick={() => reject(a.id)}
+                            disabled={updating === a.id || a.status === 'rejected'}
+                          >
+                            {updating === a.id ? '처리중...' : '거절'}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

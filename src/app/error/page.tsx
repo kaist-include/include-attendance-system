@@ -18,7 +18,7 @@ export default async function ErrorPage({ searchParams }: ErrorPageProps) {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
-            <Image src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
+            <Image src="/icon.svg" alt="Include" width={48} height={48} className="w-12 h-12 rounded" />
             <div className="leading-tight">
               <span className="text-2xl font-bold text-foreground">Attendtion</span>
               <div className="text-sm font-normal opacity-70">by include</div>

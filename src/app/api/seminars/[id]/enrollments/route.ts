@@ -48,14 +48,14 @@ export async function GET(
       .from('enrollments')
       .select(`
         *,
-        users (
+        users!enrollments_user_id_fkey (
           id,
           name,
           email
         )
       `)
       .eq('seminar_id', seminarId)
-      .order('created_at', { ascending: true });
+      .order('applied_at', { ascending: true });
 
     if (enrollmentError) {
       console.error('Error fetching enrollments:', enrollmentError);
@@ -64,7 +64,36 @@ export async function GET(
 
     console.log(`✅ Found ${enrollments?.length || 0} enrollments`);
 
-    return NextResponse.json(enrollments || []);
+    // Transform data to match frontend expectations
+    const transformedEnrollments = enrollments?.map(enrollment => ({
+      id: enrollment.id,
+      userId: enrollment.user_id,
+      name: enrollment.users?.name || 'Unknown',
+      email: enrollment.users?.email || 'Unknown',
+      appliedAt: enrollment.applied_at,
+      status: enrollment.status,
+      notes: enrollment.notes
+    })) || [];
+
+    // Calculate stats
+    const total = transformedEnrollments.length;
+    const approved = transformedEnrollments.filter(e => e.status === 'approved').length;
+    const pending = transformedEnrollments.filter(e => e.status === 'pending').length;
+    const rejected = transformedEnrollments.filter(e => e.status === 'rejected').length;
+
+    const enrollmentData = {
+      capacity: seminar.capacity,
+      stats: {
+        capacity: seminar.capacity,
+        total,
+        approved,
+        pending,
+        rejected
+      },
+      enrollments: transformedEnrollments
+    };
+
+    return NextResponse.json(enrollmentData);
 
   } catch (error) {
     console.error('Error in GET enrollments:', error);
@@ -116,6 +145,25 @@ export async function PUT(
 
     const { action, enrollmentId, userId } = await request.json();
 
+    // Prevent self-approval/rejection: Check if the enrollment being modified is the owner's own
+    const { data: enrollmentToUpdate, error: enrollmentCheckError } = await supabase
+      .from('enrollments')
+      .select('user_id')
+      .eq('id', enrollmentId)
+      .eq('seminar_id', seminarId)
+      .single();
+
+    if (enrollmentCheckError || !enrollmentToUpdate) {
+      return NextResponse.json({ error: 'Enrollment not found' }, { status: 404 });
+    }
+
+    // Prevent owners from approving/rejecting themselves (unless admin override)
+    if (enrollmentToUpdate.user_id === user.id && !isAdmin) {
+      return NextResponse.json({ 
+        error: '세미나 개설자는 자신의 신청을 승인/거절할 수 없습니다.' 
+      }, { status: 403 });
+    }
+
     if (!action || !enrollmentId) {
       return NextResponse.json({ 
         error: 'Missing required fields: action, enrollmentId' 
@@ -146,13 +194,18 @@ export async function PUT(
     } else {
       // Update enrollment status
       const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      const now = new Date().toISOString();
+      
+      const updateData: any = { status: newStatus };
+      
+      if (action === 'approve') {
+        updateData.approved_at = now;
+        updateData.approved_by = user.id;
+      }
       
       const { data: enrollment, error: updateError } = await supabase
         .from('enrollments')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', enrollmentId)
         .eq('seminar_id', seminarId)
         .select()
@@ -173,6 +226,116 @@ export async function PUT(
 
   } catch (error) {
     console.error('Error in PUT enrollments:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: seminarId } = await params;
+
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    console.log('📝 User applying to seminar:', { user: user.id, seminar: seminarId });
+
+    // Get seminar details and check if applications are open
+    const { data: seminar, error: seminarError } = await supabase
+      .from('seminars')
+      .select(`
+        title,
+        status,
+        capacity,
+        application_start,
+        application_end,
+        enrollments (id, status)
+      `)
+      .eq('id', seminarId)
+      .single();
+
+    if (seminarError || !seminar) {
+      return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
+    }
+
+    // Check if seminar is accepting applications
+    if (seminar.status !== 'recruiting') {
+      return NextResponse.json({ error: 'This seminar is not currently recruiting' }, { status: 400 });
+    }
+
+    // Check if application period is open
+    const now = new Date();
+    const appStart = new Date(seminar.application_start);
+    const appEnd = new Date(seminar.application_end);
+    
+    if (now < appStart || now > appEnd) {
+      return NextResponse.json({ error: 'Application period is closed' }, { status: 400 });
+    }
+
+    // Check if user already applied
+    const { data: existingEnrollment } = await supabase
+      .from('enrollments')
+      .select('id, status')
+      .eq('seminar_id', seminarId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (existingEnrollment) {
+      const statusMessages: Record<string, string> = {
+        pending: '이미 신청하였습니다. 승인을 기다려주세요.',
+        approved: '이미 승인된 세미나입니다.',
+        rejected: '신청이 거절된 세미나입니다.',
+        cancelled: '취소된 신청입니다.'
+      };
+      
+      const statusMessage = statusMessages[existingEnrollment.status] || '이미 신청한 세미나입니다.';
+      
+      return NextResponse.json({ error: statusMessage }, { status: 400 });
+    }
+
+    // Check capacity (only count approved enrollments)
+    const approvedEnrollments = seminar.enrollments?.filter((e: any) => e.status === 'approved').length || 0;
+    if (approvedEnrollments >= seminar.capacity) {
+      return NextResponse.json({ error: '세미나 정원이 가득 찼습니다.' }, { status: 400 });
+    }
+
+    // Get application data from request
+    const { notes } = await request.json();
+
+    // Create enrollment application (all applications start as 'pending' for owner approval)
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('enrollments')
+      .insert({
+        user_id: user.id,
+        seminar_id: seminarId,
+        status: 'pending',
+        applied_at: new Date().toISOString(),
+        notes: notes || null
+      })
+      .select()
+      .single();
+
+    if (enrollmentError) {
+      console.error('Error creating enrollment:', enrollmentError);
+      return NextResponse.json({ error: 'Failed to submit application' }, { status: 500 });
+    }
+
+    console.log('✅ Application submitted successfully:', enrollment.id);
+
+    return NextResponse.json({
+      message: '신청이 완료되었습니다. 세미나 개설자의 승인을 기다려주세요.',
+      enrollment
+    }, { status: 201 });
+
+  } catch (error) {
+    console.error('Error in POST enrollments:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 
