@@ -312,7 +312,7 @@ export default function SeminarAttendancePage() {
     }
   }, [selectedSessionId, isManager, authLoading, user?.id, id]);
 
-  // Update attendance status (manager only)
+    // Update attendance status (manager only)
   const setStatus = async (userId: string, status: Attendee['status']) => {
     if (!selectedSessionId || !isManager || authLoading || !user?.id) return;
 
@@ -320,18 +320,34 @@ export default function SeminarAttendancePage() {
       setUpdatingAttendance(userId);
       setError(null); // Clear any previous errors
 
+      console.log('🔄 Updating attendance:', { userId, status, sessionId: selectedSessionId });
+
       const response = await fetch(`/api/seminars/${id}/attendance/${selectedSessionId}`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ userId, status }),
       });
 
+      console.log('📡 Attendance update response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const responseText = await response.text();
+        console.error('❌ Raw error response:', responseText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${responseText || 'Unknown error'}` };
+        }
+        
         throw new Error(errorData.error || 'Failed to update attendance');
       }
+
+      const result = await response.json();
+      console.log('✅ Attendance updated successfully:', result);
 
       // Update local state
       setAttendees(prev => prev.map(a => 
@@ -342,7 +358,7 @@ export default function SeminarAttendancePage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update attendance';
       setError(errorMessage);
-      console.error('Error updating attendance:', err);
+      console.error('❌ Error updating attendance:', err);
     } finally {
       setUpdatingAttendance(null);
     }
@@ -396,18 +412,40 @@ export default function SeminarAttendancePage() {
     }
   };
 
-  // Calculate remaining seconds for QR expiry
-  const remainingSeconds = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+  // Calculate remaining seconds for QR expiry with real-time updates
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  
+  // Format remaining time as "x분 x초"
+  const formatRemainingTime = (seconds: number): string => {
+    if (seconds <= 0) return '만료됨';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSecs = seconds % 60;
+    if (minutes > 0) {
+      return `${minutes}분 ${remainingSecs}초`;
+    }
+    return `${remainingSecs}초`;
+  };
 
-  // Auto-refresh QR code when expired (manager only)
+  // Update remaining seconds every second and auto-refresh QR when expired
   useEffect(() => {
-    if (!expiresAt || !selectedSessionId || !isManager || authLoading || !user?.id) return;
+    if (!expiresAt || !selectedSessionId || !isManager || authLoading || !user?.id) {
+      setRemainingSeconds(0);
+      return;
+    }
     
-    const timer = setInterval(() => {
-      if (Date.now() >= expiresAt) {
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+      setRemainingSeconds(remaining);
+      
+      if (remaining === 0) {
         generateQr();
       }
-    }, 1000);
+    };
+    
+    // Initial update
+    updateTimer();
+    
+    const timer = setInterval(updateTimer, 1000);
     
     return () => clearInterval(timer);
   }, [expiresAt, selectedSessionId, isManager, authLoading, user?.id, generateQr]);
@@ -716,7 +754,7 @@ export default function SeminarAttendancePage() {
                       <Image src={qrUrl} alt="attendance qr" width={256} height={256} className="w-64 h-64" />
                       <div className="mt-4 text-center">
                         <p className="text-sm text-muted-foreground">
-                          유효 시간: {remainingSeconds}초
+                          유효 시간: {formatRemainingTime(remainingSeconds)}
                         </p>
                         {numericCode && (
                           <div className="mt-3 p-4 bg-muted rounded-lg border border-border">

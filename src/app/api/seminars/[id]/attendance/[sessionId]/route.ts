@@ -191,19 +191,51 @@ export async function POST(
       return NextResponse.json({ error: 'User is not enrolled in this seminar' }, { status: 400 });
     }
 
-    // Upsert attendance record
-    const { data: attendance, error: attendanceError } = await supabase
+    // Check if attendance record already exists
+    const { data: existingAttendance } = await supabase
       .from('attendances')
-      .upsert({
-        user_id: userId,
-        session_id: sessionId,
-        status: status,
-        checked_at: new Date().toISOString(),
-        checked_by: user.id,
-        notes: notes || null
-      })
-      .select()
+      .select('id')
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
       .single();
+
+    let attendance, attendanceError;
+
+    if (existingAttendance) {
+      // Update existing record
+      const result = await supabase
+        .from('attendances')
+        .update({
+          status: status,
+          checked_at: new Date().toISOString(),
+          checked_by: user.id,
+          notes: notes || null
+        })
+        .eq('user_id', userId)
+        .eq('session_id', sessionId)
+        .select()
+        .single();
+      
+      attendance = result.data;
+      attendanceError = result.error;
+    } else {
+      // Insert new record
+      const result = await supabase
+        .from('attendances')
+        .insert({
+          user_id: userId,
+          session_id: sessionId,
+          status: status,
+          checked_at: new Date().toISOString(),
+          checked_by: user.id,
+          notes: notes || null
+        })
+        .select()
+        .single();
+      
+      attendance = result.data;
+      attendanceError = result.error;
+    }
 
     if (attendanceError) {
       console.error('Error updating attendance:', attendanceError);
