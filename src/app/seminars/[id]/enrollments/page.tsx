@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,7 @@ export default function SeminarEnrollmentsPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const { isAdmin, isSeminarLeader } = useAuth();
+  const { user, isAdmin, isSeminarLeader } = useAuth();
   const canManage = isAdmin || isSeminarLeader;
 
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,7 @@ export default function SeminarEnrollmentsPage() {
   const [enrollmentData, setEnrollmentData] = useState<EnrollmentData | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const loadEnrollments = async () => {
+  const loadEnrollments = useCallback(async () => {
     if (!id) return;
 
     let mounted = true;
@@ -93,7 +93,7 @@ export default function SeminarEnrollmentsPage() {
     return () => {
       mounted = false;
     };
-  };
+  }, [id, user?.id]);
 
   const updateStatus = async (enrollmentId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
     if (!canManage || !id) return;
@@ -152,7 +152,7 @@ export default function SeminarEnrollmentsPage() {
 
   useEffect(() => {
     loadEnrollments();
-  }, [id]);
+  }, [id, loadEnrollments]);
 
   const approve = (enrollmentId: string) => updateStatus(enrollmentId, 'approved');
   const reject = (enrollmentId: string) => updateStatus(enrollmentId, 'rejected');

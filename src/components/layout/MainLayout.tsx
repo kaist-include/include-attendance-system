@@ -21,6 +21,7 @@ import { IncludeLogo } from '@/components/ui/logo';
 import ThemeToggle from '@/components/ui/theme-toggle';
 import { ROUTES } from '@/config/constants';
 import { signout } from '@/app/auth/actions';
+import Image from 'next/image';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -85,7 +86,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-border">
           <Link href={ROUTES.home} className="flex items-center space-x-2">
-            <img src="/icon.svg" alt="Include" className="w-8 h-8 rounded" />
+            <Image src="/icon.svg" alt="Include" className="w-8 h-8 rounded" />
             <div className="leading-tight">
               <div className="text-xl font-semibold text-foreground">Attendtion</div>
               <div className="text-sm font-normal opacity-70">by include</div>

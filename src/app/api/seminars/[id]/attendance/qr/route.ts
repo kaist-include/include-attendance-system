@@ -10,30 +10,14 @@ export async function POST(
   try {
     const { id: seminarId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    // Get authenticated user from session (handled by middleware)
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
 
     // Parse request body
     const { sessionId } = await request.json();
@@ -45,7 +29,7 @@ export async function POST(
     }
 
     // Check if session exists and user can manage it
-    const { data: session, error: sessionError } = await authenticatedSupabase
+    const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select(`
         *,
@@ -63,7 +47,7 @@ export async function POST(
     }
 
     // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -81,7 +65,7 @@ export async function POST(
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
     // Update session with QR code (we could store this in a separate table for better management)
-    const { error: updateError } = await authenticatedSupabase
+    const { error: updateError } = await supabase
       .from('sessions')
       .update({ 
         materials_url: JSON.stringify({
@@ -126,30 +110,13 @@ export async function PUT(
   try {
     const { id: seminarId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
 
     // Parse request body
     const { qrData } = await request.json();
@@ -179,7 +146,7 @@ export async function PUT(
     }
 
     // Verify QR code against session
-    const { data: session, error: sessionError } = await authenticatedSupabase
+    const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select('materials_url, seminar_id')
       .eq('id', sessionId)
@@ -190,14 +157,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Verify QR code
+    // Parse materials_url to get QR data
     let sessionQrData;
     try {
-      sessionQrData = JSON.parse(session.materials_url || '{}');
+      sessionQrData = JSON.parse(session.materials_url);
     } catch (e) {
-      return NextResponse.json({ error: 'Invalid session QR data' }, { status: 400 });
+      return NextResponse.json({ error: 'No active QR code for this session' }, { status: 400 });
     }
 
+    // Verify QR code matches
     if (sessionQrData.qr_code !== qrCode) {
       return NextResponse.json({ error: 'Invalid QR code' }, { status: 400 });
     }
@@ -208,7 +176,7 @@ export async function PUT(
     }
 
     // Check if user is enrolled in the seminar
-    const { data: enrollment, error: enrollmentError } = await authenticatedSupabase
+    const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
       .select('id')
       .eq('user_id', user.id)
@@ -220,20 +188,16 @@ export async function PUT(
       return NextResponse.json({ error: 'User is not enrolled in this seminar' }, { status: 400 });
     }
 
-    // Mark attendance as present
-    const attendanceData = {
-      user_id: user.id,
-      session_id: sessionId,
-      status: 'present',
-      checked_at: new Date().toISOString(),
-      checked_by: user.id, // Self-checked via QR
-      qr_code: qrCode
-    };
-
-    const { data: attendance, error: attendanceError } = await authenticatedSupabase
+    // Mark attendance
+    const { data: attendance, error: attendanceError } = await supabase
       .from('attendances')
-      .upsert(attendanceData, {
-        onConflict: 'user_id,session_id'
+      .upsert({
+        user_id: user.id,
+        session_id: sessionId,
+        status: 'present',
+        checked_at: new Date().toISOString(),
+        checked_by: 'qr_code',
+        notes: `QR 코드로 출석 확인 (${new Date().toLocaleString('ko-KR')})`
       })
       .select()
       .single();
@@ -243,14 +207,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to mark attendance' }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return NextResponse.json({ 
       message: 'Attendance marked successfully',
-      attendance,
-      sessionId,
-      userId: user.id
+      attendance 
     });
+
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Error in PUT attendance/qr:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

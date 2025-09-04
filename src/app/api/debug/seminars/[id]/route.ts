@@ -9,53 +9,36 @@ export async function GET(
     const { id: seminarId } = await params;
     console.log('🔍 Debug API called for seminar:', seminarId);
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization', authError }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check seminar exists
-    const { data: seminar, error: seminarError } = await authenticatedSupabase
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
       .select('*')
       .eq('id', seminarId)
       .single();
 
     // Check user exists in users table
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('id', user.id)
       .single();
 
     // Check sessions
-    const { data: sessions, error: sessionsError } = await authenticatedSupabase
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
       .select('*')
       .eq('seminar_id', seminarId);
 
     // Check enrollments
-    const { data: enrollments, error: enrollmentsError } = await authenticatedSupabase
+    const { data: enrollments, error: enrollmentsError } = await supabase
       .from('enrollments')
       .select('*')
       .eq('seminar_id', seminarId);

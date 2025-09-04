@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
+import Image from 'next/image';
 
 const features = [
   {
@@ -58,7 +59,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-2">
-              <img src="/icon.svg" alt="Include" className="w-10 h-10 rounded" />
+              <Image src="/icon.svg" alt="Include" className="w-10 h-10 rounded" />
               <div className="leading-tight">
                 <h1 className="text-2xl font-bold text-foreground">Attendtion</h1>
                 <div className="text-sm font-normal opacity-70">by include</div>
@@ -158,7 +159,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <img src="/icon.svg" alt="Include" className="w-8 h-8 rounded" />
+              <Image src="/icon.svg" alt="Include" className="w-8 h-8 rounded" />
               <div className="leading-tight">
                 <div className="text-xl font-bold">Attendtion</div>
                 <div className="text-sm font-normal opacity-70">by include</div>

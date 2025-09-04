@@ -18,13 +18,10 @@ export async function POST(request: NextRequest) {
       app_metadata: user.app_metadata
     });
 
-    // Use authenticated client - RLS will handle permissions
-    const authenticatedSupabase = supabase;
-
-    console.log('🔑 Using both authenticated and service Supabase clients');
+    console.log('🔑 Using authenticated Supabase client with RLS');
 
     // Check if user already exists in users table
-    const { data: existingUser, error: checkError } = await authenticatedSupabase
+    const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('*')
       .eq('id', user.id)
@@ -47,7 +44,7 @@ export async function POST(request: NextRequest) {
                  email.split('@')[0] || 
                  'User';
 
-    // Create user record using service client to bypass RLS
+    // Create user record
     console.log('📝 Attempting to create user with data:', {
       id: user.id,
       email: email,
@@ -55,58 +52,73 @@ export async function POST(request: NextRequest) {
       role: 'member'
     });
 
-    const { data: newUser, error: createError } = await serviceSupabase
+    const { data: newUser, error: createError } = await supabase
       .from('users')
       .insert({
         id: user.id,
         email: email,
         name: name,
-        role: 'member'
+        role: 'member',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
 
     if (createError) {
-      console.error('❌ Error creating user:', createError);
+      console.error('❌ Failed to create user:', createError);
+      
+      // If user creation failed due to RLS, they might need admin assistance
+      if (createError.code === '42501') {
+        return NextResponse.json({ 
+          error: 'User creation requires admin assistance',
+          details: 'Please contact an administrator to create your user record'
+        }, { status: 403 });
+      }
+      
       return NextResponse.json({ 
         error: 'Failed to create user record',
-        details: createError.message 
+        details: createError.message,
+        code: createError.code
       }, { status: 500 });
     }
 
-    console.log('✅ User created successfully:', newUser);
+    console.log('✅ Created user record:', newUser);
 
-    // Also create profile if it doesn't exist
-    const { data: existingProfile } = await serviceSupabase
+    // Also check/create profile record if it doesn't exist
+    const { data: existingProfile } = await supabase
       .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
+      .select('id')
+      .eq('id', user.id)
       .single();
 
     if (!existingProfile) {
-      console.log('📝 Creating profile record');
-      
-      const { error: profileError } = await serviceSupabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .insert({
-          user_id: user.id,
-          nickname: name
+          id: user.id,
+          name: name,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
 
       if (profileError) {
-        console.error('⚠️ Error creating profile (non-critical):', profileError);
+        console.warn('⚠️ Profile creation failed, but user created successfully:', profileError);
       } else {
-        console.log('✅ Profile created successfully');
+        console.log('✅ Created profile record');
       }
     }
 
+    console.log('🎉 User sync completed successfully');
+
     return NextResponse.json({
-      message: 'User synced successfully',
-      user: newUser
+      message: 'User sync completed successfully',
+      user: newUser,
+      operation: 'created'
     });
 
   } catch (error) {
-    console.error('❌ User sync error:', error);
+    console.error('❌ User Sync API error:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,10 +13,16 @@ export async function POST(request: NextRequest) {
 
     console.log('🚀 Force syncing user:', user.id);
 
-    // Use service client to bypass all RLS policies (only when needed)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceSupabase = createSupabaseClient(supabaseUrl, supabaseServiceKey);
+    // Check if user is admin (required for force sync)
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !currentUser || currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
 
     // Extract user info
     const email = user.email || '';
@@ -30,7 +35,7 @@ export async function POST(request: NextRequest) {
     console.log('📊 User info:', { id: user.id, email, name });
 
     // First, check if user record already exists
-    const { data: existingUser, error: checkError } = await serviceSupabase
+    const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('*')
       .eq('id', user.id)
@@ -46,58 +51,68 @@ export async function POST(request: NextRequest) {
     if (existingUser) {
       // Update existing user
       console.log('📝 Updating existing user record');
-      const { data: updatedUser, error: updateError } = await serviceSupabase
+      const { data: updatedUser, error: updateError } = await supabase
         .from('users')
         .update({
-          email,
-          name,
-          updated_at: new Date().toISOString(),
+          email: email,
+          name: name,
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id)
         .select()
         .single();
 
       if (updateError) {
-        console.error('Error updating user:', updateError);
-        return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
+        console.error('❌ Failed to update user:', updateError);
+        return NextResponse.json({ 
+          error: 'Failed to update user record',
+          details: updateError.message
+        }, { status: 500 });
       }
 
       userRecord = updatedUser;
-      console.log('✅ User record updated');
+      console.log('✅ Updated user record:', userRecord);
     } else {
       // Create new user record
-      console.log('➕ Creating new user record');
-      const { data: newUser, error: insertError } = await serviceSupabase
-      .from('users')
-      .insert({
-        id: user.id,
-          email,
-          name,
-          role: 'student', // Default role
-        created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+      console.log('📝 Creating new user record');
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: email,
+          name: name,
+          role: 'member',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
       if (insertError) {
-        console.error('Error creating user:', insertError);
-        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
-    }
+        console.error('❌ Failed to create user:', insertError);
+        return NextResponse.json({ 
+          error: 'Failed to create user record',
+          details: insertError.message
+        }, { status: 500 });
+      }
 
       userRecord = newUser;
-      console.log('✅ User record created');
+      console.log('✅ Created user record:', userRecord);
     }
 
-    console.log('🎯 Force sync completed successfully');
+    console.log('🎉 Force sync completed successfully');
 
     return NextResponse.json({
-      message: 'User sync completed successfully',
+      message: 'User force sync completed successfully',
       user: userRecord,
-      action: existingUser ? 'updated' : 'created'
+      operation: existingUser ? 'updated' : 'created'
     });
+
   } catch (error) {
-    console.error('API Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('❌ Force Sync API error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 } 

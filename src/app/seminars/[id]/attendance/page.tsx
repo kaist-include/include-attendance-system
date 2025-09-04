@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import QRCode from 'qrcode';
 import { createClient } from '@/utils/supabase/client';
-
+import { useAuth } from '@/hooks/useAuth';
+import Image from 'next/image';
 // Manager interfaces (existing)
 interface AttendanceSession {
   id: string;
@@ -86,6 +87,7 @@ export default function SeminarAttendancePage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
+  const { user } = useAuth();
 
   // Common state
   const [loading, setLoading] = useState(true);
@@ -194,7 +196,8 @@ export default function SeminarAttendancePage() {
     return () => {
       mounted = false;
     };
-  }, [id]); // Removed selectedSessionId from dependencies to prevent infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // Removed selectedSessionId and user?.id from dependencies to prevent infinite loop
 
   // Load specific session attendance (manager only)
   useEffect(() => {
@@ -246,10 +249,10 @@ export default function SeminarAttendancePage() {
     return () => {
       mounted = false;
     };
-  }, [selectedSessionId, id, attendanceData, isManager]);
+  }, [selectedSessionId, id, attendanceData, isManager, user?.id]);
 
   // Generate QR Code (manager only)
-  const generateQr = async () => {
+  const generateQr = useCallback(async () => {
     if (!selectedSessionId || !isManager) return;
 
     try {
@@ -275,7 +278,7 @@ export default function SeminarAttendancePage() {
       
       // Generate QR code image
       const dataUrl = await QRCode.toDataURL(qrData, { width: 256 });
-    setQrUrl(dataUrl);
+      setQrUrl(dataUrl);
       setExpiresAt(new Date(expiry).getTime());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate QR code');
@@ -283,7 +286,7 @@ export default function SeminarAttendancePage() {
     } finally {
       setGeneratingQr(false);
     }
-  };
+  }, [selectedSessionId, isManager, user?.id, id]);
 
   // Update attendance status (manager only)
   const setStatus = async (userId: string, status: Attendee['status']) => {
@@ -384,14 +387,14 @@ export default function SeminarAttendancePage() {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [expiresAt, selectedSessionId, isManager]);
+  }, [expiresAt, selectedSessionId, isManager, generateQr]);
 
   // Generate QR on session change (manager only)
   useEffect(() => {
     if (selectedSessionId && isManager) {
       generateQr();
     }
-  }, [selectedSessionId, isManager]);
+  }, [selectedSessionId, isManager, generateQr]);
 
   // Calculate statistics (manager only)
   const managerStats = useMemo(() => {
@@ -635,7 +638,7 @@ export default function SeminarAttendancePage() {
               </div>
               <div className="md:col-span-2 flex flex-col items-center justify-center">
                   {qrUrl ? (
-                  <img src={qrUrl} alt="attendance qr" className="w-64 h-64" />
+                  <Image src={qrUrl} alt="attendance qr" className="w-64 h-64" />
                   ) : (
                     <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted-foreground rounded">
                       <span className="text-muted-foreground">QR 코드 생성 중...</span>

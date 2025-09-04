@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Date formatting utilities
-export const formatDate = (date: string | Date, formatStr = DATE_CONFIG.defaultFormat) => {
+export const formatDate = (date: string | Date, formatStr: string = DATE_CONFIG.defaultFormat) => {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(dateObj)) return '';

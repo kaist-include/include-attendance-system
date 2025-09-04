@@ -19,6 +19,12 @@ function applyThemeClass(theme: ThemeMode): void {
   else root.classList.remove("dark");
 }
 
+const options: { label: string; value: ThemeMode; icon: React.ComponentType<{ className?: string }> }[] = [
+  { label: '라이트', value: 'light', icon: Sun },
+  { label: '다크', value: 'dark', icon: Moon },
+  { label: '시스템', value: 'system', icon: Laptop },
+];
+
 export function ThemeToggle({ className }: { className?: string }) {
   const [mode, setMode] = useState<ThemeMode>("system");
   const [index, setIndex] = useState<number>(0);
@@ -58,12 +64,6 @@ export function ThemeToggle({ className }: { className?: string }) {
     if (mode === "dark") return Moon;
     return Laptop;
   }, [mode]);
-
-  const options: { label: string; value: ThemeMode; icon: React.ComponentType<{ className?: string }> }[] = [
-    { label: '라이트', value: 'light', icon: Sun },
-    { label: '다크', value: 'dark', icon: Moon },
-    { label: '시스템', value: 'system', icon: Laptop },
-  ];
 
   // Keep index in sync with current mode
   useEffect(() => {

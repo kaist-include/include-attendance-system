@@ -45,10 +45,10 @@ async function recalculateSeminarDates(seminarId: string, supabase: any) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; sessionId: string } }
+  { params }: { params: Promise<{ id: string; sessionId: string }> }
 ) {
   try {
-    const { id: seminarId, sessionId } = params;
+    const { id: seminarId, sessionId } = await params;
 
     console.log('📖 Fetching session details for seminar:', seminarId, 'session:', sessionId);
 
@@ -99,10 +99,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; sessionId: string } }
+  { params }: { params: Promise<{ id: string; sessionId: string }> }
 ) {
   try {
-    const { id: seminarId, sessionId } = params;
+    const { id: seminarId, sessionId } = await params;
     
     console.log('📝 Updating session:', sessionId, 'for seminar:', seminarId);
 
@@ -189,10 +189,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; sessionId: string } }
+  { params }: { params: Promise<{ id: string; sessionId: string }> }
 ) {
   try {
-    const { id: seminarId, sessionId } = params;
+    const { id: seminarId, sessionId } = await params;
     
     console.log('🗑️ Deleting session:', sessionId, 'for seminar:', seminarId);
 

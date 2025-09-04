@@ -14,14 +14,14 @@ export default function CreateSeminarPage() {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    capacity: DEFAULTS.seminarCapacity,
+    capacity: DEFAULTS.seminarCapacity as number,
     semester: '2025-1',
     start_date: '',
     end_date: '',
     application_start: '',
     application_end: '',
     location: '',
-    application_type: 'first_come' as const,
+    application_type: 'first_come' as 'first_come' | 'selection',
     tags: [] as string[],
     tagInput: '',
   });

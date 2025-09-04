@@ -18,14 +18,14 @@ export default function EditSeminarPage() {
   const [form, setForm] = useState({
     title: '세미나 제목',
     description: '세미나 설명',
-    capacity: DEFAULTS.seminarCapacity,
+    capacity: DEFAULTS.seminarCapacity as number,
     semester: '2025-1',
     start_date: '2025-01-15',
     end_date: '2025-03-15',
     application_start: '2024-12-20',
     application_end: '2025-01-20',
     location: 'KAIST',
-    application_type: 'first_come' as const,
+    application_type: 'first_come' as 'first_come' | 'selection',
     tags: ['기초'] as string[],
     tagInput: '',
   });

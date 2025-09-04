@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import { Profile, UserRole } from '@/types';
 import { getErrorMessage } from '@/lib/utils';
-import { ROUTES } from '@/config/constants';
 
 interface AuthContextType {
   user: User | null;
@@ -36,61 +35,8 @@ export const useAuthProvider = (): AuthContextType => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state
-  useEffect(() => {
-    let mounted = true;
-    const supabase = createClient();
-
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          if (session?.user) {
-            setUser(session.user);
-            await loadUserData(session.user.id);
-          }
-          setLoading(false);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(getErrorMessage(err));
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!mounted) return;
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          // Use setTimeout to defer async operations and prevent deadlock
-          setTimeout(async () => {
-          await loadUserData(session.user.id);
-          }, 0);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setUserRole(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
   // Load user data (both profile and role)
-  const loadUserData = async (userId: string) => {
+  const loadUserData = useCallback(async (userId: string) => {
     const supabase = createClient();
     
     try {
@@ -183,7 +129,60 @@ export const useAuthProvider = (): AuthContextType => {
       console.error('Error loading user data:', err);
       setError(getErrorMessage(err));
     }
-  };
+  }, [user?.user_metadata?.name]);
+
+  // Initialize auth state
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          if (session?.user) {
+            setUser(session.user);
+            await loadUserData(session.user.id);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(getErrorMessage(err));
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) return;
+
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
+          // Use setTimeout to defer async operations and prevent deadlock
+          setTimeout(async () => {
+          await loadUserData(session.user.id);
+          }, 0);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setProfile(null);
+          setUserRole(null);
+        }
+        
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [loadUserData]);
 
   // Update profile
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -249,7 +248,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Protected route hook
-export const useRequireAuth = (redirectTo = ROUTES.login) => {
+export const useRequireAuth = (redirectTo = '/login') => {
   const { user, loading } = useAuth();
 
   useEffect(() => {

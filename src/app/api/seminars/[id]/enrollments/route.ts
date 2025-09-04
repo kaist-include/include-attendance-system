@@ -8,29 +8,18 @@ export async function GET(
   try {
     const { id: seminarId } = await params;
 
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     console.log('🔍 Fetching enrollments for seminar:', seminarId);
 
-    // Use service client for comprehensive data access
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // Check if user has permission to manage this seminar
-    const { data: seminar, error: seminarError } = await serviceSupabase
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
       .select('owner_id, capacity')
       .eq('id', seminarId)
@@ -40,74 +29,46 @@ export async function GET(
       return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
     }
 
-    // Check permission - only seminar owner or admin can manage enrollments
-    const { data: currentUser } = await serviceSupabase
+    // Check permissions
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    const isAdmin = currentUser?.role === 'admin';
     const isOwner = seminar.owner_id === user.id;
+    const isAdmin = userRecord?.role === 'admin';
 
-    if (!isAdmin && !isOwner) {
+    if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
 
-    // Fetch enrollments with user details (specify which users relationship to use)
-    const { data: enrollments, error: enrollmentsError } = await serviceSupabase
+    // Get enrollments with user details
+    const { data: enrollments, error: enrollmentError } = await supabase
       .from('enrollments')
       .select(`
-        id,
-        user_id,
-        status,
-        applied_at,
-        users!enrollments_user_id_fkey (
+        *,
+        users (
           id,
           name,
           email
         )
       `)
       .eq('seminar_id', seminarId)
-      .order('applied_at', { ascending: true });
+      .order('created_at', { ascending: true });
 
-    if (enrollmentsError) {
-      console.error('Error fetching enrollments:', enrollmentsError);
+    if (enrollmentError) {
+      console.error('Error fetching enrollments:', enrollmentError);
       return NextResponse.json({ error: 'Failed to fetch enrollments' }, { status: 500 });
     }
 
-    console.log('✅ Fetched enrollments:', enrollments?.length || 0, 'records');
+    console.log(`✅ Found ${enrollments?.length || 0} enrollments`);
 
-    // Transform data for frontend
-    const transformedEnrollments = enrollments?.map(enrollment => ({
-      id: enrollment.id,
-      userId: enrollment.user_id,
-      name: enrollment.users?.name || 'Unknown',
-      email: enrollment.users?.email || 'Unknown',
-      appliedAt: enrollment.applied_at,
-      status: enrollment.status
-    })) || [];
-
-    const stats = {
-      capacity: seminar.capacity,
-      total: transformedEnrollments.length,
-      approved: transformedEnrollments.filter(e => e.status === 'approved').length,
-      pending: transformedEnrollments.filter(e => e.status === 'pending').length,
-      rejected: transformedEnrollments.filter(e => e.status === 'rejected').length
-    };
-
-    return NextResponse.json({
-      capacity: seminar.capacity,
-      stats,
-      enrollments: transformedEnrollments
-    });
+    return NextResponse.json(enrollments || []);
 
   } catch (error) {
-    console.error('❌ Enrollments API error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error in GET enrollments:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -117,82 +78,101 @@ export async function PUT(
 ) {
   try {
     const { id: seminarId } = await params;
-    const { enrollmentId, status } = await request.json();
 
-    if (!enrollmentId || !status || !['pending', 'approved', 'rejected'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
-    }
-
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    console.log('🔄 Updating enrollment status:', enrollmentId, 'to', status);
+    console.log('🔍 Managing enrollments for seminar:', seminarId);
 
-    // Use service client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Check permission
-    const { data: seminar } = await serviceSupabase
+    // Check if user has permission to manage this seminar
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
-      .select('owner_id')
+      .select('owner_id, title, capacity')
       .eq('id', seminarId)
       .single();
 
-    const { data: currentUser } = await serviceSupabase
+    if (seminarError || !seminar) {
+      return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
+    }
+
+    // Check permissions
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    const isAdmin = currentUser?.role === 'admin';
-    const isOwner = seminar?.owner_id === user.id;
+    const isOwner = seminar.owner_id === user.id;
+    const isAdmin = userRecord?.role === 'admin';
 
-    if (!isAdmin && !isOwner) {
+    if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
 
-    // Update enrollment status
-    const { data: updatedEnrollment, error: updateError } = await serviceSupabase
-      .from('enrollments')
-      .update({ 
-        status,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', enrollmentId)
-      .eq('seminar_id', seminarId)
-      .select()
-      .single();
+    const { action, enrollmentId, userId } = await request.json();
 
-    if (updateError) {
-      console.error('Error updating enrollment:', updateError);
-      return NextResponse.json({ error: 'Failed to update enrollment' }, { status: 500 });
+    if (!action || !enrollmentId) {
+      return NextResponse.json({ 
+        error: 'Missing required fields: action, enrollmentId' 
+      }, { status: 400 });
     }
 
-    console.log('✅ Updated enrollment status successfully');
+    const validActions = ['approve', 'reject', 'remove'];
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ 
+        error: 'Invalid action. Must be one of: ' + validActions.join(', ')
+      }, { status: 400 });
+    }
 
-    return NextResponse.json({
-      message: 'Enrollment status updated successfully',
-      enrollment: updatedEnrollment
-    });
+    if (action === 'remove') {
+      // Delete enrollment
+      const { error: deleteError } = await supabase
+        .from('enrollments')
+        .delete()
+        .eq('id', enrollmentId)
+        .eq('seminar_id', seminarId);
+
+      if (deleteError) {
+        console.error('Error removing enrollment:', deleteError);
+        return NextResponse.json({ error: 'Failed to remove enrollment' }, { status: 500 });
+      }
+
+      return NextResponse.json({ message: 'Enrollment removed successfully' });
+    } else {
+      // Update enrollment status
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      
+      const { data: enrollment, error: updateError } = await supabase
+        .from('enrollments')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', enrollmentId)
+        .eq('seminar_id', seminarId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating enrollment:', updateError);
+        return NextResponse.json({ error: 'Failed to update enrollment' }, { status: 500 });
+      }
+
+      console.log(`✅ Enrollment ${action}d successfully:`, enrollment);
+
+      return NextResponse.json({
+        message: `Enrollment ${action}d successfully`,
+        enrollment
+      });
+    }
 
   } catch (error) {
-    console.error('❌ Update enrollment error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error in PUT enrollments:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

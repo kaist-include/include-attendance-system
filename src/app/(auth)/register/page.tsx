@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 import { signup } from '@/app/auth/actions';
-
+import Image from 'next/image';
 export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -13,7 +13,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
-            <img src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
+            <Image src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
             <div className="leading-tight">
               <span className="text-2xl font-bold text-foreground">Attendtion</span>
               <div className="text-sm font-normal opacity-70">by include</div>
