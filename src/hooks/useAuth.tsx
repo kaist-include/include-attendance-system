@@ -2,18 +2,16 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase, getCurrentUser, signOut } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Profile, UserRole } from '@/types';
 import { getErrorMessage } from '@/lib/utils';
+import { ROUTES } from '@/config/constants';
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   userRole: UserRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
-  signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isAdmin: boolean;
@@ -41,6 +39,7 @@ export const useAuthProvider = (): AuthContextType => {
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    const supabase = createClient();
 
     const initializeAuth = async () => {
       try {
@@ -65,12 +64,15 @@ export const useAuthProvider = (): AuthContextType => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return;
 
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
+          // Use setTimeout to defer async operations and prevent deadlock
+          setTimeout(async () => {
           await loadUserData(session.user.id);
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
@@ -89,6 +91,8 @@ export const useAuthProvider = (): AuthContextType => {
 
   // Load user data (both profile and role)
   const loadUserData = async (userId: string) => {
+    const supabase = createClient();
+    
     try {
       // Load user role from users table
       const { data: userData, error: userError } = await supabase
@@ -181,70 +185,11 @@ export const useAuthProvider = (): AuthContextType => {
     }
   };
 
-  // Sign in
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      // User data will be loaded automatically by the auth state change listener
-    } catch (err) {
-      setError(getErrorMessage(err));
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Sign up
-  const signUp = async (email: string, password: string, name: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
-      });
-
-      if (error) throw error;
-    } catch (err) {
-      setError(getErrorMessage(err));
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Sign out
-  const handleSignOut = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      await signOut();
-    } catch (err) {
-      setError(getErrorMessage(err));
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Update profile
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user || !profile) throw new Error('User not authenticated');
+    
+    const supabase = createClient();
 
     try {
       setError(null);
@@ -289,9 +234,6 @@ export const useAuthProvider = (): AuthContextType => {
     profile,
     userRole,
     loading,
-    signIn,
-    signUp,
-    signOut: handleSignOut,
     updateProfile,
     hasRole,
     isAdmin,
@@ -307,7 +249,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Protected route hook
-export const useRequireAuth = (redirectTo = '/login') => {
+export const useRequireAuth = (redirectTo = ROUTES.login) => {
   const { user, loading } = useAuth();
 
   useEffect(() => {

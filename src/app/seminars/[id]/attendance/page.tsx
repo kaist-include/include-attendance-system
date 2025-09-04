@@ -6,7 +6,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import QRCode from 'qrcode';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 // Manager interfaces (existing)
 interface AttendanceSession {
@@ -114,11 +114,7 @@ export default function SeminarAttendancePage() {
   // Update states
   const [updatingAttendance, setUpdatingAttendance] = useState<string | null>(null);
 
-  // Helper function to get auth token
-  const getAuthToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
-  };
+  // Auth is now handled by SSR middleware - no need for manual token handling
 
   // Determine user role and load appropriate data
   useEffect(() => {
@@ -130,18 +126,17 @@ export default function SeminarAttendancePage() {
       try {
         setLoading(true);
         setError(null);
-        const token = await getAuthToken();
         
-        if (!token) {
+        if (!user?.id) {
           throw new Error('Authentication required');
         }
 
         console.log('🔍 Checking user role for attendance access');
 
-        // First, try to access manager API
+        // First, try to access manager API - auth handled by middleware
         const managerResponse = await fetch(`/api/seminars/${id}/attendance`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         });
 
@@ -163,7 +158,7 @@ export default function SeminarAttendancePage() {
           console.log('👤 User is not a manager - trying member access');
           const memberResponse = await fetch(`/api/seminars/${id}/my-attendance`, {
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
             },
           });
 
@@ -209,9 +204,7 @@ export default function SeminarAttendancePage() {
 
     const loadSessionAttendance = async () => {
       try {
-        const token = await getAuthToken();
-        
-        if (!token) {
+        if (!user?.id) {
           throw new Error('Authentication required');
         }
 
@@ -219,7 +212,7 @@ export default function SeminarAttendancePage() {
         
         const response = await fetch(`/api/seminars/${id}/attendance/${selectedSessionId}`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         });
 
@@ -261,9 +254,8 @@ export default function SeminarAttendancePage() {
 
     try {
       setGeneratingQr(true);
-      const token = await getAuthToken();
       
-      if (!token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
@@ -271,7 +263,6 @@ export default function SeminarAttendancePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ sessionId: selectedSessionId }),
       });
@@ -300,9 +291,8 @@ export default function SeminarAttendancePage() {
 
     try {
       setUpdatingAttendance(userId);
-      const token = await getAuthToken();
       
-      if (!token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
@@ -310,7 +300,6 @@ export default function SeminarAttendancePage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ userId, status }),
       });
@@ -340,9 +329,8 @@ export default function SeminarAttendancePage() {
     try {
       setScanningQr(true);
       setScanMessage('');
-      const token = await getAuthToken();
       
-      if (!token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
@@ -350,7 +338,6 @@ export default function SeminarAttendancePage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ qrData: qrInput.trim() }),
       });

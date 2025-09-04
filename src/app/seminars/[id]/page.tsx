@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, DATE_CONFIG, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import type { ApplicationType, Session } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 const semesterOptions = ['2025-1', '2024-2', '2024-1', '2023-2'];
 const categoryTags = ['기초', '백엔드', '프론트엔드', 'AI'];
@@ -96,6 +96,7 @@ export default function SeminarDetailPage() {
 
   // Helper function to get auth token
   const getAuthToken = async () => {
+            const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
   };
@@ -110,17 +111,13 @@ export default function SeminarDetailPage() {
       try {
         setLoading(true);
         setError(null);
-        const token = await getAuthToken();
         
-        const headers: HeadersInit = {
+        // With SSR pattern, authentication is handled automatically by middleware
+        const response = await fetch(`/api/seminars/${id}`, {
+          headers: {
           'Content-Type': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
         }
-
-        const response = await fetch(`/api/seminars/${id}`, { headers });
+        });
         
         if (!mounted) return;
         
@@ -169,17 +166,12 @@ export default function SeminarDetailPage() {
   // Helper function to refresh seminar data
   const refreshSeminarData = async () => {
     try {
-      const token = await getAuthToken();
-      
-      const headers: HeadersInit = {
+      // With SSR pattern, authentication is handled automatically by middleware
+      const response = await fetch(`/api/seminars/${id}`, {
+        headers: {
         'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
       }
-
-      const response = await fetch(`/api/seminars/${id}`, { headers });
+      });
       
       if (!response.ok) {
         throw new Error('Failed to refresh seminar data');
@@ -205,9 +197,7 @@ export default function SeminarDetailPage() {
 
     try {
       setSaving(true);
-      const token = await getAuthToken();
-      
-      if (!token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
@@ -215,7 +205,6 @@ export default function SeminarDetailPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: editData.title,
@@ -263,9 +252,7 @@ export default function SeminarDetailPage() {
 
     try {
       setAddingSession(true);
-      const token = await getAuthToken();
-      
-      if (!token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
@@ -273,7 +260,6 @@ export default function SeminarDetailPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
       title: newSession.title,
@@ -314,16 +300,14 @@ export default function SeminarDetailPage() {
     if (!confirm('이 세션을 삭제하시겠습니까?')) return;
 
     try {
-      const token = await getAuthToken();
-      
-      if (!token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
       const response = await fetch(`/api/seminars/${id}/sessions/${sessionId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
@@ -512,7 +496,12 @@ export default function SeminarDetailPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {seminarData.startDate} ~ {seminarData.endDate || '미정'}
+                      {seminarData.startDate 
+                        ? new Date(seminarData.startDate).toLocaleDateString('ko-KR') 
+                        : '시작일 미정'} ~ {' '}
+                      {seminarData.endDate 
+                        ? new Date(seminarData.endDate).toLocaleDateString('ko-KR') 
+                        : '미정'}
                     </p>
                   )}
                   {isEditing && (
@@ -541,7 +530,12 @@ export default function SeminarDetailPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {new Date(seminarData.applicationStart).toLocaleDateString()} ~ {new Date(seminarData.applicationEnd).toLocaleDateString()}
+                      {seminarData.applicationStart 
+                        ? new Date(seminarData.applicationStart).toLocaleDateString('ko-KR') 
+                        : '시작일 미정'} ~ {' '}
+                      {seminarData.applicationEnd 
+                        ? new Date(seminarData.applicationEnd).toLocaleDateString('ko-KR') 
+                        : '종료일 미정'}
                     </p>
                   )}
                 </div>

@@ -1,96 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     console.log('🔍 Debugging user state for:', user.id);
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
-    // Check auth user details
-    const authUserInfo = {
-      id: user.id,
-      email: user.email,
-      user_metadata: user.user_metadata,
-      app_metadata: user.app_metadata,
-      created_at: user.created_at,
-      last_sign_in_at: user.last_sign_in_at
-    };
-
-    // Check if user exists in users table
-    const { data: dbUser, error: userError } = await authenticatedSupabase
+    // Get user profile from database
+    const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    // Check if profile exists
-    const { data: profile, error: profileError } = await authenticatedSupabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+      return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
+    }
 
-    // Check seminars owned by this user
-    const { data: ownedSeminars, error: seminarsError } = await authenticatedSupabase
-      .from('seminars')
-      .select('id, title, owner_id')
-      .eq('owner_id', user.id);
+    // Get user enrollments
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from('enrollments')
+      .select(`
+        *,
+        seminars (
+          title,
+          status
+        )
+      `)
+      .eq('user_id', user.id);
 
-    return NextResponse.json({
-      debug_info: {
-        auth_user: authUserInfo,
-        db_user: {
-          exists: !userError,
-          data: dbUser,
-          error: userError?.message
-        },
-        profile: {
-          exists: !profileError,
-          data: profile,
-          error: profileError?.message
-        },
-        owned_seminars: {
-          count: ownedSeminars?.length || 0,
-          data: ownedSeminars,
-          error: seminarsError?.message
-        },
-        extracted_name: user.user_metadata?.name || 
-                       user.user_metadata?.full_name || 
-                       user.email?.split('@')[0] || 
-                       'Unknown',
-        timestamp: new Date().toISOString()
+    if (enrollmentsError) {
+      console.error('Enrollments fetch error:', enrollmentsError);
+      return NextResponse.json({ error: 'Failed to fetch enrollments' }, { status: 500 });
+    }
+
+    // Get user attendance
+    const { data: attendance, error: attendanceError } = await supabase
+      .from('attendance')
+      .select(`
+        *,
+        sessions (
+          title,
+          date,
+          seminars (
+            title
+          )
+        )
+      `)
+      .eq('user_id', user.id);
+
+    if (attendanceError) {
+      console.error('Attendance fetch error:', attendanceError);
+      return NextResponse.json({ error: 'Failed to fetch attendance' }, { status: 500 });
+    }
+
+    const debugInfo = {
+      user: {
+        id: user.id,
+        email: user.email,
+        email_verified: user.email_confirmed_at,
+        last_sign_in: user.last_sign_in_at,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+        app_metadata: user.app_metadata,
+        user_metadata: user.user_metadata,
+      },
+      profile,
+      enrollments: enrollments || [],
+      attendance: attendance || [],
+      stats: {
+        enrollments_count: enrollments?.length || 0,
+        attendance_count: attendance?.length || 0,
+        has_profile: !!profile,
       }
-    });
+    };
 
+    console.log('🎯 Debug info compiled successfully');
+
+    return NextResponse.json(debugInfo);
   } catch (error) {
-    console.error('❌ Debug error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('API Error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

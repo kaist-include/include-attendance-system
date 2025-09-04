@@ -8,7 +8,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/config/constants';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 interface Seminar {
   id: string;
@@ -81,18 +81,10 @@ export default function SeminarsPage() {
           params.append('tags', selectedTags.join(','));
         }
 
-        // Get session for authentication (optional - seminars should work without auth too)
-        const { data: sessionData } = await supabase.auth.getSession();
-        const session = sessionData?.session;
-        
+        // With SSR middleware, auth is handled automatically
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
         };
-        
-        // Add auth header if user is logged in
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
         
         const response = await fetch(`/api/seminars?${params.toString()}`, {
           method: 'GET',
@@ -101,13 +93,21 @@ export default function SeminarsPage() {
         
         if (response.ok) {
           const data = await response.json();
+          // Ensure data is an array
+          if (Array.isArray(data)) {
           setSeminars(data);
+          } else {
+            console.error('API returned non-array data:', data);
+            setSeminars([]);
+          }
         } else {
           const errorText = await response.text();
           console.error('Failed to fetch seminars:', response.status, errorText);
+          setSeminars([]); // Ensure we have an empty array on error
         }
       } catch (error) {
         console.error('Error fetching seminars:', error);
+        setSeminars([]); // Ensure we have an empty array on error
       } finally {
         setLoading(false);
       }
@@ -116,12 +116,12 @@ export default function SeminarsPage() {
     fetchSeminars();
   }, [statusFilter, searchTerm, selectedTags]);
 
-  // 모든 태그 수집
-  const allTags = Array.from(new Set(seminars.flatMap(seminar => seminar.tags)));
-  const allSemesters = Array.from(new Set(seminars.map(seminar => (seminar as any).semester).filter(Boolean)));
+  // 모든 태그 수집 - with safe array check
+  const allTags = Array.from(new Set((seminars || []).flatMap(seminar => seminar.tags || [])));
+  const allSemesters = Array.from(new Set((seminars || []).map(seminar => (seminar as any).semester).filter(Boolean)));
 
   // Client-side filtering is now done by the API, but we keep this for immediate UI feedback
-  const filteredSeminars = seminars.filter(seminar => {
+  const filteredSeminars = (seminars || []).filter(seminar => {
     const matchesSemester = semesterFilter === 'all' || (seminar as any).semester === semesterFilter;
     return matchesSemester;
   });
@@ -266,8 +266,12 @@ export default function SeminarsPage() {
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4 mr-2" />
                     <span>
-                      {new Date(seminar.startDate).toLocaleDateString('ko-KR')} ~ {' '}
-                      {seminar.endDate ? new Date(seminar.endDate).toLocaleDateString('ko-KR') : '진행중'}
+                      {seminar.startDate 
+                        ? new Date(seminar.startDate).toLocaleDateString('ko-KR') 
+                        : '시작일 미정'} ~ {' '}
+                      {seminar.endDate 
+                        ? new Date(seminar.endDate).toLocaleDateString('ko-KR') 
+                        : '진행중'}
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">

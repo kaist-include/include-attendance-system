@@ -6,7 +6,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 interface Applicant {
   id: string;
@@ -50,16 +50,15 @@ export default function SeminarEnrollmentsPage() {
       setLoading(true);
       setError(null);
 
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
       console.log('🔍 Loading enrollments for seminar:', id);
 
+      // With SSR pattern, authentication is handled automatically by middleware
       const response = await fetch(`/api/seminars/${id}/enrollments`, {
         headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -104,17 +103,16 @@ export default function SeminarEnrollmentsPage() {
     try {
       setUpdating(enrollmentId);
 
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
+      if (!user?.id) {
         throw new Error('Authentication required');
       }
 
       console.log('🔄 Updating enrollment status:', enrollmentId, 'to', newStatus);
 
+      // With SSR pattern, authentication is handled automatically by middleware
       const response = await fetch(`/api/seminars/${id}/enrollments`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

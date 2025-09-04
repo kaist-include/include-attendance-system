@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { IncludeLogo } from '@/components/ui/logo';
 import ThemeToggle from '@/components/ui/theme-toggle';
 import { ROUTES } from '@/config/constants';
+import { signout } from '@/app/auth/actions';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -53,14 +54,13 @@ const navItems: NavItem[] = [
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, profile, signOut, isAdmin, isSeminarLeader } = useAuth();
+  const { user, profile, isAdmin, isSeminarLeader } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   const handleSignOut = async () => {
     try {
-      await signOut();
-      router.push(ROUTES.login);
+      await signout(); // Using Server Action
     } catch (error) {
       console.error('Sign out error:', error);
     }

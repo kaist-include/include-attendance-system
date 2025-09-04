@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 // Helper function to recalculate seminar start/end dates based on sessions
 async function updateSeminarDates(seminarId: string, serviceSupabase: any) {

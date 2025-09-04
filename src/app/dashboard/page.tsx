@@ -6,7 +6,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 interface UpcomingSession {
   id: string;
@@ -46,17 +46,8 @@ export default function DashboardPage() {
       try {
         setSessionsLoading(true);
         
-        // Get user session for authorization
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Error getting session:', sessionError);
-          if (!cancelled) setSessionsLoading(false);
-          return;
-        }
-        
-        const session = sessionData?.session;
-        if (!session?.access_token || cancelled) {
+        // With SSR pattern, auth is handled automatically by middleware
+        if (!user?.id || cancelled) {
           if (!cancelled) setSessionsLoading(false);
           return;
         }
@@ -64,7 +55,6 @@ export default function DashboardPage() {
         const response = await fetch('/api/sessions/upcoming', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
         });
