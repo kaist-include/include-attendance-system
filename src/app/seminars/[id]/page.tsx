@@ -57,7 +57,7 @@ export default function SeminarDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const { user, isAdmin, isSeminarLeader } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   // State for seminar data
   const [seminarData, setSeminarData] = useState<SeminarData | null>(null);
@@ -92,7 +92,7 @@ export default function SeminarDetailPage() {
   const [newTag, setNewTag] = useState('');
   const [addingSession, setAddingSession] = useState(false);
 
-  const canManage = isAdmin || (isSeminarLeader && user?.id === seminarData?.owner.id);
+  const canManage = isAdmin || (user?.id === seminarData?.owner.id);
 
   // Helper function to get auth token
   const getAuthToken = async () => {
@@ -420,17 +420,22 @@ export default function SeminarDetailPage() {
             {!user ? (
               <Button onClick={handleEnroll}>신청하기</Button>
             ) : seminarData.currentUserEnrollment ? (
-              // 이미 신청한 사용자
+              // 이미 신청한 사용자 - 모든 신청은 승인 대기
               seminarData.currentUserEnrollment.status === 'pending' ? (
-                <Button variant="secondary" disabled>신청중</Button>
+                <Button variant="secondary" disabled>승인 대기중</Button>
               ) : seminarData.currentUserEnrollment.status === 'approved' ? (
                 <Button variant="outline" disabled>수강중</Button>
               ) : (
                 <Button variant="destructive" disabled>신청 거절</Button>
               )
             ) : seminarData.enrollments.approved < seminarData.capacity ? (
-              // 신청하지 않았고 정원이 남은 경우
-              <Button onClick={handleEnroll}>신청하기</Button>
+              // 신청하지 않았고 정원이 남은 경우 - 승인 방식 안내
+              <div className="flex flex-col gap-2">
+                <Button onClick={handleEnroll}>신청하기</Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  신청 후 세미나 개설자의 승인을 받아야 합니다
+                </p>
+              </div>
             ) : (
               // 정원 마감
               <Button variant="secondary" disabled>정원 마감</Button>

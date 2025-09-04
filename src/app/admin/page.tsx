@@ -9,9 +9,9 @@ import { ROUTES } from '@/config/constants';
 
 export default function AdminPage() {
   useRequireAuth();
-  const { isAdmin, isSeminarLeader } = useAuth();
+  const { isAdmin } = useAuth();
 
-  const allowed = isAdmin || isSeminarLeader;
+  const allowed = isAdmin;
 
   return (
     <MainLayout>

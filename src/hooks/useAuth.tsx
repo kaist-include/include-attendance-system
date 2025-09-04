@@ -14,7 +14,6 @@ interface AuthContextType {
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isAdmin: boolean;
-  isSeminarLeader: boolean;
   error: string | null;
 }
 
@@ -218,15 +217,11 @@ export const useAuthProvider = (): AuthContextType => {
     // Admin has access to everything
     if (userRole === 'admin') return true;
     
-    // Seminar leaders have access to seminar_leader and member roles
-    if (userRole === 'seminar_leader' && (role === 'seminar_leader' || role === 'member')) return true;
-    
     // Check exact role match
     return userRole === role;
   };
 
   const isAdmin = userRole === 'admin';
-  const isSeminarLeader = userRole === 'seminar_leader' || isAdmin;
 
   return {
     user,
@@ -236,7 +231,6 @@ export const useAuthProvider = (): AuthContextType => {
     updateProfile,
     hasRole,
     isAdmin,
-    isSeminarLeader,
     error,
   };
 };

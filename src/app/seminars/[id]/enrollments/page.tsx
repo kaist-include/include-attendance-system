@@ -33,8 +33,8 @@ export default function SeminarEnrollmentsPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const { user, isAdmin, isSeminarLeader } = useAuth();
-  const canManage = isAdmin || isSeminarLeader;
+  const { user, isAdmin } = useAuth();
+  // canManage will be determined by API ownership check
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +96,7 @@ export default function SeminarEnrollmentsPage() {
   }, [id, user?.id]);
 
   const updateStatus = async (enrollmentId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
-    if (!canManage || !id) return;
+    if (!id) return;
 
     let mounted = true;
 
@@ -284,26 +284,22 @@ export default function SeminarEnrollmentsPage() {
                       }`}>
                         {a.status === 'approved' ? '승인' : a.status === 'rejected' ? '거절' : '대기'}
                       </span>
-                      {canManage && (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => approve(a.id)}
-                            disabled={updating === a.id || a.status === 'approved'}
-                          >
-                            {updating === a.id ? '처리중...' : '승인'}
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="secondary" 
-                            onClick={() => reject(a.id)}
-                            disabled={updating === a.id || a.status === 'rejected'}
-                          >
-                            {updating === a.id ? '처리중...' : '거절'}
-                          </Button>
-                        </>
-                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => approve(a.id)}
+                        disabled={updating === a.id || a.status === 'approved'}
+                      >
+                        {updating === a.id ? '처리중...' : '승인'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        onClick={() => reject(a.id)}
+                        disabled={updating === a.id || a.status === 'rejected'}
+                      >
+                        {updating === a.id ? '처리중...' : '거절'}
+                      </Button>
                     </div>
                   </div>
                 ))}

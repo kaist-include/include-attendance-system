@@ -49,13 +49,13 @@ const navItems: NavItem[] = [
     href: ROUTES.admin,
     label: '관리자',
     icon: Users,
-    roles: ['admin', 'seminar_leader'],
+    roles: ['admin'],
   },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, profile, isAdmin, isSeminarLeader } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -71,7 +71,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     if (!item.roles) return true;
     return item.roles.some(role => {
       if (role === 'admin') return isAdmin;
-      if (role === 'seminar_leader') return isSeminarLeader;
       return false;
     });
   });

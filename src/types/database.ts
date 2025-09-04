@@ -6,7 +6,7 @@ export type Database = {
           id: string;
           email: string;
           name: string;
-          role: 'admin' | 'seminar_leader' | 'member';
+          role: 'admin' | 'member';
           created_at: string;
           updated_at: string;
         };
@@ -14,7 +14,7 @@ export type Database = {
           id?: string;
           email: string;
           name: string;
-          role?: 'admin' | 'seminar_leader' | 'member';
+          role?: 'admin' | 'member';
           created_at?: string;
           updated_at?: string;
         };
@@ -22,7 +22,7 @@ export type Database = {
           id?: string;
           email?: string;
           name?: string;
-          role?: 'admin' | 'seminar_leader' | 'member';
+          role?: 'admin' | 'member';
           updated_at?: string;
         };
       };
@@ -325,7 +325,7 @@ export type Database = {
       [_ in never]: never;
     };
     Enums: {
-      user_role: 'admin' | 'seminar_leader' | 'member';
+      user_role: 'admin' | 'member';
       seminar_status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
       application_type: 'first_come' | 'selection';
       session_status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';

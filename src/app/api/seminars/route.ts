@@ -5,6 +5,9 @@ export async function GET(request: NextRequest) {
   try {
     // Create Supabase client - will be authenticated if user has valid session
     const supabase = await createClient();
+    
+    // Get current user to check enrollment status
+    const { data: { user } } = await supabase.auth.getUser();
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -25,6 +28,7 @@ export async function GET(request: NextRequest) {
         ),
         enrollments (
           id,
+          user_id,
           status
         ),
         sessions (
@@ -54,21 +58,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to match frontend expectations
-    const transformedSeminars = data?.map(seminar => ({
+    const transformedSeminars = data?.map(seminar => {
+      // Check current user's enrollment status
+      const currentUserEnrollment = user ? 
+        seminar.enrollments?.find((e: any) => e.user_id === user.id) : null;
+      
+      return {
         id: seminar.id,
         title: seminar.title,
         description: seminar.description,
-      instructor: seminar.users?.name || 'Unknown',
+        instructor: seminar.users?.name || 'Unknown',
         startDate: seminar.start_date,
         endDate: seminar.end_date,
-      capacity: seminar.capacity || seminar.max_participants || 0,
-      enrolled: seminar.enrollments?.length || 0,
+        capacity: seminar.capacity || seminar.max_participants || 0,
+        enrolled: seminar.enrollments?.filter((e: any) => e.status === 'approved').length || 0,
         location: seminar.location,
         tags: seminar.tags || [],
         status: seminar.status,
         sessions: seminar.sessions?.length || 0,
         semester: seminar.semesters?.name || 'Unknown',
-    })) || [];
+        applicationStart: seminar.application_start,
+        applicationEnd: seminar.application_end,
+        applicationType: seminar.application_type,
+        currentUserEnrollment: currentUserEnrollment ? {
+          status: currentUserEnrollment.status,
+          applied_at: currentUserEnrollment.applied_at
+        } : null,
+      };
+    }) || [];
 
     return NextResponse.json(transformedSeminars);
   } catch (error) {
@@ -95,51 +112,60 @@ export async function POST(request: NextRequest) {
       applicationType: data.applicationType
     });
 
-    // Check if user has permission to create seminars
-    const { data: userRecord, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userRecord) {
-      return NextResponse.json({ error: 'User record not found' }, { status: 404 });
+    // Get semester by name from the request
+    const semesterName = data.semester;
+    if (!semesterName) {
+      return NextResponse.json({ error: 'Semester is required' }, { status: 400 });
     }
 
-    const hasPermission = userRecord.role === 'admin' || userRecord.role === 'seminar_leader';
-    if (!hasPermission) {
-      return NextResponse.json({ 
-        error: 'Permission denied. Only administrators and seminar leaders can create seminars.' 
-      }, { status: 403 });
-    }
-
-    // Get active semester
-    const { data: activeSemester, error: semesterError } = await supabase
+    // Find or create semester by name
+    let { data: semester, error: semesterError } = await supabase
       .from('semesters')
       .select('id')
-      .eq('is_active', true)
+      .eq('name', semesterName)
       .single();
 
-    if (semesterError || !activeSemester) {
-      return NextResponse.json({ error: 'No active semester found' }, { status: 400 });
-    }
+    if (semesterError || !semester) {
+      // If semester doesn't exist, create it
+      const { data: newSemester, error: createError } = await supabase
+        .from('semesters')
+        .insert({
+          name: semesterName,
+          start_date: data.start_date || data.startDate,
+          end_date: data.end_date || data.endDate || data.start_date || data.startDate,
+          is_active: false
+        })
+        .select()
+        .single();
 
-    // Create seminar
+             if (createError || !newSemester) {
+         console.error('Error creating semester:', createError);
+         return NextResponse.json({ error: 'Failed to create semester' }, { status: 500 });
+       }
+
+       semester = newSemester;
+     }
+
+     if (!semester) {
+       return NextResponse.json({ error: 'Semester not found' }, { status: 400 });
+     }
+
+     // Create seminar
     const { data: seminar, error } = await supabase
       .from('seminars')
       .insert({
         title: data.title,
         description: data.description,
         capacity: data.capacity,
-        start_date: data.startDate,
-        end_date: data.endDate,
+        start_date: data.start_date || data.startDate,
+        end_date: data.end_date || data.endDate,
         location: data.location,
         owner_id: user.id,
-        semester_id: activeSemester.id,
+        semester_id: semester.id,
         status: 'draft',
-        application_type: data.applicationType,
-        application_start: data.applicationStart,
-        application_end: data.applicationEnd,
+        application_type: data.application_type || data.applicationType,
+        application_start: data.application_start || data.applicationStart,
+        application_end: data.application_end || data.applicationEnd,
         tags: data.tags || [],
       })
       .select()
@@ -151,6 +177,26 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Seminar created successfully:', seminar.id);
+
+    // Automatically enroll the creator in their own seminar
+    const { error: enrollmentError } = await supabase
+      .from('enrollments')
+      .insert({
+        user_id: user.id,
+        seminar_id: seminar.id,
+        status: 'approved',
+        applied_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+        approved_by: user.id, // Self-approved
+        notes: 'Automatically enrolled as seminar creator'
+      });
+
+    if (enrollmentError) {
+      console.warn('Warning: Failed to auto-enroll creator:', enrollmentError);
+      // Don't fail the seminar creation if enrollment fails - just log it
+    } else {
+      console.log('✅ Creator automatically enrolled in seminar');
+    }
 
     return NextResponse.json({ seminar });
   } catch (error) {

@@ -9,8 +9,8 @@ import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import { useAuth, useRequireRole } from '@/hooks/useAuth';
 
 export default function EditSeminarPage() {
-  useRequireRole('seminar_leader');
-  const { isAdmin, isSeminarLeader } = useAuth();
+  // No role requirement - ownership will be checked via API
+  const { isAdmin } = useAuth();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -25,12 +25,12 @@ export default function EditSeminarPage() {
     application_start: '2024-12-20',
     application_end: '2025-01-20',
     location: 'KAIST',
-    application_type: 'first_come' as 'first_come' | 'selection',
+    application_type: 'selection' as 'first_come' | 'selection',
     tags: ['기초'] as string[],
     tagInput: '',
   });
 
-  const canEdit = isAdmin || isSeminarLeader;
+  // canEdit will be determined by API ownership check
 
   const addTag = () => {
     const t = form.tagInput.trim();
@@ -46,7 +46,7 @@ export default function EditSeminarPage() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canEdit) return;
+    // API will handle permission checking
     // Here we would call API to update the seminar
     alert('세미나가 수정되었습니다 (Mock)');
     router.push(ROUTES.seminarDetail(id || ''));
@@ -171,23 +171,11 @@ export default function EditSeminarPage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground">신청 방식</label>
-                  <div className="mt-2 flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={form.application_type === 'first_come'}
-                        onChange={() => setForm(f => ({ ...f, application_type: 'first_come' }))}
-                      />
-                      선착순
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={form.application_type === 'selection'}
-                        onChange={() => setForm(f => ({ ...f, application_type: 'selection' }))}
-                      />
-                      선발제
-                    </label>
+                  <div className="mt-2 p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      📝 모든 세미나는 <strong>Owner 승인 방식</strong>입니다<br/>
+                      신청자는 신청 후 세미나 개설자의 승인을 받아야 합니다
+                    </p>
                   </div>
                 </div>
 
@@ -214,7 +202,7 @@ export default function EditSeminarPage() {
               </div>
 
               <div className="pt-2 flex gap-2">
-                <Button type="submit" disabled={!canEdit}>저장</Button>
+                <Button type="submit">저장</Button>
                 <Button type="button" variant="outline" onClick={() => router.push(ROUTES.seminarDetail(id || ''))}>취소</Button>
               </div>
             </form>

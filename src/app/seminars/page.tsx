@@ -24,6 +24,13 @@ interface Seminar {
   status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
   sessions: number;
   semester: string;
+  applicationStart: string;
+  applicationEnd: string;
+  applicationType: 'first_come' | 'selection';
+  currentUserEnrollment: {
+    status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+    applied_at: string;
+  } | null;
 }
 
 const statusLabels = {
@@ -144,6 +151,24 @@ export default function SeminarsPage() {
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     );
+  };
+
+  // Helper function to check if application is open
+  const isApplicationOpen = (seminar: Seminar) => {
+    const now = new Date();
+    const appStart = new Date(seminar.applicationStart);
+    const appEnd = new Date(seminar.applicationEnd);
+    return now >= appStart && now <= appEnd;
+  };
+
+  // Helper function to check if user can apply
+  const canUserApply = (seminar: Seminar) => {
+    if (!user) return false;
+    if (seminar.currentUserEnrollment) return false; // Already applied/enrolled
+    if (seminar.enrolled >= seminar.capacity) return false; // Full capacity
+    if (seminar.status !== 'recruiting') return false; // Not recruiting
+    if (!isApplicationOpen(seminar)) return false; // Application period closed
+    return true;
   };
 
   return (
@@ -286,6 +311,15 @@ export default function SeminarsPage() {
                     <Users className="w-4 h-4 mr-2" />
                     <span>학기: <span className="font-medium text-foreground/90">{seminar.semester}</span></span>
                   </div>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <GraduationCap className="w-4 h-4 mr-2" />
+                    <span>
+                      신청: {new Date(seminar.applicationStart).toLocaleDateString('ko-KR')} ~ {new Date(seminar.applicationEnd).toLocaleDateString('ko-KR')}
+                      {isApplicationOpen(seminar) && (
+                        <span className="ml-2 text-green-600 font-medium">• 신청 가능</span>
+                      )}
+                    </span>
+                  </div>
                 </div>
 
                         {/* 정원 정보 */}
@@ -328,18 +362,50 @@ export default function SeminarsPage() {
                       상세보기
                     </Button>
                   </Link>
-                  {user && seminar.status === 'recruiting' && seminar.enrolled < seminar.capacity && (
-                    <Link href={ROUTES.applySeminar(seminar.id.toString())} className="flex-1">
-                      <Button className="w-full">
-                        신청하기
-                      </Button>
-                    </Link>
-                  )}
-                  {user && seminar.status === 'recruiting' && seminar.enrolled >= seminar.capacity && (
-                    <Button variant="secondary" className="flex-1" disabled>
-                      정원 마감
-                    </Button>
-                  )}
+                  {user && (() => {
+                    // Show different buttons based on user's status and application conditions
+                    if (seminar.currentUserEnrollment) {
+                      // User already applied/enrolled
+                      switch (seminar.currentUserEnrollment.status) {
+                        case 'pending':
+                          return <Button variant="secondary" className="flex-1" disabled>승인 대기중</Button>;
+                        case 'approved':
+                          return <Button variant="outline" className="flex-1" disabled>수강중</Button>;
+                        case 'rejected':
+                          return <Button variant="destructive" className="flex-1" disabled>신청 거절</Button>;
+                        case 'cancelled':
+                          return <Button variant="secondary" className="flex-1" disabled>신청 취소</Button>;
+                      }
+                                         } else if (canUserApply(seminar)) {
+                       // User can apply - now all applications require owner approval
+                       return (
+                         <div className="flex-1 flex flex-col gap-1">
+                           <Link href={ROUTES.applySeminar(seminar.id.toString())} className="w-full">
+                             <Button className="w-full">신청하기</Button>
+                           </Link>
+                           <p className="text-xs text-muted-foreground text-center">승인 방식</p>
+                         </div>
+                       );
+                    } else if (seminar.enrolled >= seminar.capacity) {
+                      // Full capacity
+                      return <Button variant="secondary" className="flex-1" disabled>정원 마감</Button>;
+                    } else if (!isApplicationOpen(seminar)) {
+                      // Application period closed
+                      const now = new Date();
+                      const appStart = new Date(seminar.applicationStart);
+                      const appEnd = new Date(seminar.applicationEnd);
+                      
+                      if (now < appStart) {
+                        return <Button variant="secondary" className="flex-1" disabled>신청 예정</Button>;
+                      } else {
+                        return <Button variant="secondary" className="flex-1" disabled>신청 마감</Button>;
+                      }
+                    } else if (seminar.status !== 'recruiting') {
+                      // Not recruiting
+                      return <Button variant="secondary" className="flex-1" disabled>신청 불가</Button>;
+                    }
+                    return null;
+                  })()}
                 </div>
               </CardContent>
             </Card>

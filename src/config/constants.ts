@@ -82,7 +82,7 @@ export const DEFAULTS = {
   sessionStatus: 'scheduled' as const,
   enrollmentStatus: 'pending' as const,
   attendanceStatus: 'absent' as const,
-  applicationType: 'first_come' as const,
+  applicationType: 'selection' as const,
   sessionDuration: 120, // 2 hours
   seminarCapacity: 20,
 } as const;
