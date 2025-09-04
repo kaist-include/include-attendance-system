@@ -234,9 +234,9 @@ CREATE POLICY "Admin can view all profiles" ON profiles FOR SELECT USING (
 
 -- Semesters policies (readable by all authenticated users)
 CREATE POLICY "Authenticated users can view semesters" ON semesters FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Admin can manage semesters" ON semesters FOR ALL USING (
+CREATE POLICY "Admin and seminar leaders can manage semesters" ON semesters FOR ALL USING (
   EXISTS (
-    SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin'
+    SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role IN ('admin', 'seminar_leader')
   )
 );
 

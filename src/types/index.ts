@@ -19,7 +19,7 @@ export interface Profile {
   updated_at: string;
 }
 
-export type UserRole = 'admin' | 'seminar_leader' | 'member';
+export type UserRole = 'admin' | 'member';
 
 // Semester Types
 export interface Semester {

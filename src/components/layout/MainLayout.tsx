@@ -20,6 +20,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { IncludeLogo } from '@/components/ui/logo';
 import ThemeToggle from '@/components/ui/theme-toggle';
 import { ROUTES } from '@/config/constants';
+import { signout } from '@/app/auth/actions';
+import Image from 'next/image';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -47,20 +49,19 @@ const navItems: NavItem[] = [
     href: ROUTES.admin,
     label: '관리자',
     icon: Users,
-    roles: ['admin', 'seminar_leader'],
+    roles: ['admin'],
   },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, profile, signOut, isAdmin, isSeminarLeader } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   const handleSignOut = async () => {
     try {
-      await signOut();
-      router.push(ROUTES.login);
+      await signout(); // Using Server Action
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -70,7 +71,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
     if (!item.roles) return true;
     return item.roles.some(role => {
       if (role === 'admin') return isAdmin;
-      if (role === 'seminar_leader') return isSeminarLeader;
       return false;
     });
   });
@@ -85,7 +85,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-border">
           <Link href={ROUTES.home} className="flex items-center space-x-2">
-            <img src="/icon.svg" alt="Include" className="w-8 h-8 rounded" />
+            <Image src="/icon.svg" alt="Include" width={32} height={32} className="w-8 h-8 rounded" />
             <div className="leading-tight">
               <div className="text-xl font-semibold text-foreground">Attendtion</div>
               <div className="text-sm font-normal opacity-70">by include</div>

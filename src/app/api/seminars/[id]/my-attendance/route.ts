@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -9,15 +9,9 @@ export async function GET(
     const { id: seminarId } = await params;
     console.log('🔍 My Attendance API called for seminar:', seminarId);
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      console.log('❌ No authorization header');
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
       console.log('❌ Auth error:', authError);
@@ -26,20 +20,8 @@ export async function GET(
 
     console.log('✅ User authenticated:', user.id);
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check if seminar exists
-    const { data: seminar, error: seminarError } = await authenticatedSupabase
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
       .select('id, title, owner_id')
       .eq('id', seminarId)
@@ -53,7 +35,7 @@ export async function GET(
     console.log('✅ Seminar found:', seminar.title);
 
     // Check if user is enrolled in this seminar
-    const { data: enrollment, error: enrollmentError } = await authenticatedSupabase
+    const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
       .select('status')
       .eq('user_id', user.id)
@@ -73,7 +55,7 @@ export async function GET(
     console.log('✅ User is enrolled and approved');
 
     // Check user role for UI purposes
-    const { data: userRecord } = await authenticatedSupabase
+    const { data: userRecord } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -82,7 +64,7 @@ export async function GET(
     const isManager = seminar.owner_id === user.id || userRecord?.role === 'admin';
 
     // Get sessions for this seminar
-    const { data: sessions, error: sessionsError } = await authenticatedSupabase
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
       .select(`
         id,
@@ -109,7 +91,7 @@ export async function GET(
     let myAttendances: any[] = [];
     
     if (sessionIds.length > 0) {
-      const { data: attendanceData, error: attendanceError } = await authenticatedSupabase
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendances')
         .select(`
           session_id,

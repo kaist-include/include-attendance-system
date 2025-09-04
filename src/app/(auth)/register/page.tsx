@@ -1,76 +1,19 @@
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
-
+import { signup } from '@/app/auth/actions';
+import Image from 'next/image';
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const { signUp } = useAuth();
-  const router = useRouter();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    // 비밀번호 확인
-    if (formData.password !== formData.confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.');
-      setIsLoading(false);
-      return;
-    }
-
-    // 비밀번호 길이 확인
-    if (formData.password.length < 8) {
-      setError('비밀번호는 8자 이상이어야 합니다.');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      await signUp(formData.email, formData.password, formData.name);
-      // 회원가입 성공 시 로그인 페이지로 이동
-      router.push(ROUTES.login + '?message=signup-success');
-    } catch (err: any) {
-      setError(err.message || '회원가입 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const isFormValid = formData.name && formData.email && formData.password && formData.confirmPassword;
-
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href={ROUTES.home} className="inline-flex items-center space-x-2">
-            <img src="/icon.svg" alt="Include" className="w-12 h-12 rounded" />
+            <Image src="/icon.svg" alt="Include" width={48} height={48} className="w-12 h-12 rounded" />
             <div className="leading-tight">
               <span className="text-2xl font-bold text-foreground">Attendtion</span>
               <div className="text-sm font-normal opacity-70">by include</div>
@@ -87,13 +30,7 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg text-sm">
-                  {error}
-                </div>
-              )}
-
+            <form action={signup} className="space-y-6">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium text-foreground">
                   이름
@@ -104,8 +41,6 @@ export default function RegisterPage() {
                     id="name"
                     name="name"
                     type="text"
-                    value={formData.name}
-                    onChange={handleChange}
                     className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                     placeholder="이름을 입력하세요"
                     required
@@ -123,8 +58,6 @@ export default function RegisterPage() {
                     id="email"
                     name="email"
                     type="email"
-                    value={formData.email}
-                    onChange={handleChange}
                     className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                     placeholder="이메일을 입력하세요"
                     required
@@ -141,20 +74,12 @@ export default function RegisterPage() {
                   <input
                     id="password"
                     name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="pl-10 pr-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
+                    type="password"
+                    className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                     placeholder="비밀번호를 입력하세요 (8자 이상)"
                     required
+                    minLength={8}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
                 </div>
               </div>
 
@@ -167,20 +92,11 @@ export default function RegisterPage() {
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className="pl-10 pr-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
+                    type="password"
+                    className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
                     placeholder="비밀번호를 다시 입력하세요"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
                 </div>
               </div>
 
@@ -188,9 +104,8 @@ export default function RegisterPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={!isFormValid || isLoading}
               >
-                {isLoading ? '회원가입 중...' : '회원가입'}
+                회원가입
               </Button>
             </form>
 

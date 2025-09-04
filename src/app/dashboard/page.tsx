@@ -6,7 +6,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 interface UpcomingSession {
   id: string;
@@ -46,17 +46,8 @@ export default function DashboardPage() {
       try {
         setSessionsLoading(true);
         
-        // Get user session for authorization
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Error getting session:', sessionError);
-          if (!cancelled) setSessionsLoading(false);
-          return;
-        }
-        
-        const session = sessionData?.session;
-        if (!session?.access_token || cancelled) {
+        // With SSR pattern, auth is handled automatically by middleware
+        if (!user?.id || cancelled) {
           if (!cancelled) setSessionsLoading(false);
           return;
         }
@@ -64,7 +55,6 @@ export default function DashboardPage() {
         const response = await fetch('/api/sessions/upcoming', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
         });
@@ -211,21 +201,21 @@ export default function DashboardPage() {
               {sessionsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                  <span className="ml-2 text-gray-600">세션을 불러오는 중...</span>
+                  <span className="ml-2 text-muted-foreground">세션을 불러오는 중...</span>
                 </div>
               ) : (
                 <>
                   {upcomingSessions.map((session) => (
                     <div
                       key={session.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      className="border border-border rounded-lg p-4 hover:bg-accent transition-colors"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{session.title}</h3>
-                          <p className="text-sm text-gray-600 mt-1">{session.session}</p>
-                          <p className="text-sm text-gray-700 mt-1 font-medium">{session.sessionTitle}</p>
-                          <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                          <h3 className="font-medium text-foreground">{session.title}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">{session.session}</p>
+                          <p className="text-sm text-foreground/90 mt-1 font-medium">{session.sessionTitle}</p>
+                          <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
                             <span>{session.date}</span>
                             <span>{session.time}</span>
                             <span>{session.location}</span>
@@ -239,8 +229,8 @@ export default function DashboardPage() {
                   ))}
                   
                   {upcomingSessions.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                       <p>다가오는 세션이 없습니다</p>
                       <p className="text-sm mt-1">세미나에 신청하여 세션에 참여해보세요</p>
                     </div>
@@ -285,8 +275,8 @@ export default function DashboardPage() {
               ))}
               
               {recentAnnouncements.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <Bell className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                   <p>새로운 공지사항이 없습니다</p>
                 </div>
               )}

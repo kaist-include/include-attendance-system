@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     console.log('🚀 Force syncing user:', user.id);
 
-    // Use service client to bypass all RLS policies
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Check if user is admin (required for force sync)
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !currentUser || currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
 
     // Extract user info
     const email = user.email || '';
@@ -30,88 +30,86 @@ export async function POST(request: NextRequest) {
                  user.user_metadata?.full_name || 
                  user.user_metadata?.display_name ||
                  email.split('@')[0] || 
-                 'User';
+                 'Unknown User';
 
-    console.log('📋 Extracted user info:', { id: user.id, email, name });
+    console.log('📊 User info:', { id: user.id, email, name });
 
-    // Delete existing user record if it exists (to start fresh)
-    const { error: deleteUserError } = await serviceSupabase
+    // First, check if user record already exists
+    const { data: existingUser, error: checkError } = await supabase
       .from('users')
-      .delete()
-      .eq('id', user.id);
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    if (deleteUserError) {
-      console.log('⚠️ No existing user record to delete (this is fine)');
+    if (checkError) {
+      console.error('Error checking existing user:', checkError);
+      return NextResponse.json({ error: 'Failed to check user status' }, { status: 500 });
+    }
+
+    let userRecord;
+    
+    if (existingUser) {
+      // Update existing user
+      console.log('📝 Updating existing user record');
+      const { data: updatedUser, error: updateError } = await supabase
+        .from('users')
+        .update({
+          email: email,
+          name: name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ Failed to update user:', updateError);
+        return NextResponse.json({ 
+          error: 'Failed to update user record',
+          details: updateError.message
+        }, { status: 500 });
+      }
+
+      userRecord = updatedUser;
+      console.log('✅ Updated user record:', userRecord);
     } else {
-      console.log('🗑️ Deleted existing user record');
+      // Create new user record
+      console.log('📝 Creating new user record');
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: email,
+          name: name,
+          role: 'member',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('❌ Failed to create user:', insertError);
+        return NextResponse.json({ 
+          error: 'Failed to create user record',
+          details: insertError.message
+        }, { status: 500 });
+      }
+
+      userRecord = newUser;
+      console.log('✅ Created user record:', userRecord);
     }
 
-    // Delete existing profile record if it exists
-    const { error: deleteProfileError } = await serviceSupabase
-      .from('profiles')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (deleteProfileError) {
-      console.log('⚠️ No existing profile record to delete (this is fine)');
-    } else {
-      console.log('🗑️ Deleted existing profile record');
-    }
-
-    // Create fresh user record
-    const { data: newUser, error: createUserError } = await serviceSupabase
-      .from('users')
-      .insert({
-        id: user.id,
-        email: email,
-        name: name,
-        role: 'member',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (createUserError) {
-      console.error('❌ Failed to create user:', createUserError);
-      return NextResponse.json({ 
-        error: 'Failed to create user record',
-        details: createUserError.message,
-        code: createUserError.code
-      }, { status: 500 });
-    }
-
-    console.log('✅ Created user record:', newUser);
-
-    // Create fresh profile record
-    const { data: newProfile, error: createProfileError } = await serviceSupabase
-      .from('profiles')
-      .insert({
-        user_id: user.id,
-        nickname: name,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (createProfileError) {
-      console.error('❌ Failed to create profile:', createProfileError);
-      // Don't fail the whole operation for profile creation
-    } else {
-      console.log('✅ Created profile record:', newProfile);
-    }
+    console.log('🎉 Force sync completed successfully');
 
     return NextResponse.json({
-      message: 'User force-synced successfully',
-      user: newUser,
-      profile: newProfile,
-      extracted_name: name,
-      timestamp: new Date().toISOString()
+      message: 'User force sync completed successfully',
+      user: userRecord,
+      operation: existingUser ? 'updated' : 'created'
     });
 
   } catch (error) {
-    console.error('❌ Force sync error:', error);
+    console.error('❌ Force Sync API error:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

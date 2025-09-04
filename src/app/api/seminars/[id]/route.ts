@@ -1,69 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    let authenticatedSupabase = supabase;
-    
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token) {
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-        
-        if (!authError && user) {
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-          authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-            global: {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            }
-          });
-        }
-      }
-    }
+    const { id: seminarId } = await params;
+    console.log('📖 Fetching seminar details:', seminarId);
 
-    // Get seminar details with related data
-    const { data: seminar, error: seminarError } = await authenticatedSupabase
+    // Create client - authentication is optional for this endpoint
+    const supabase = await createClient();
+    
+    // Get current user (if authenticated) to check enrollment status
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Fetch seminar with all related data
+    const { data: seminar, error } = await supabase
       .from('seminars')
       .select(`
         *,
-        semesters (
-          id,
+        users!owner_id (
           name,
-          start_date,
-          end_date,
+          email
+        ),
+        semesters (
+          name,
           is_active
+        ),
+        enrollments (
+          id,
+          user_id,
+          status,
+          applied_at,
+          users!enrollments_user_id_fkey (
+            name,
+            email
+          )
         ),
         sessions (
           id,
-          session_number,
           title,
           description,
           date,
           duration_minutes,
           location,
-          materials_url,
+          session_number,
           status,
-          created_at,
-          updated_at
+          materials_url
         )
       `)
-      .eq('id', id)
+      .eq('id', seminarId)
       .single();
 
-    if (seminarError) {
-      console.error('Error fetching seminar:', seminarError);
-      if (seminarError.code === 'PGRST116') {
+    if (error) {
+      console.error('Seminar fetch error:', error);
+      if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
       }
       return NextResponse.json({ error: 'Failed to fetch seminar' }, { status: 500 });
@@ -73,100 +65,58 @@ export async function GET(
       return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
     }
 
-    // Use service key to fetch users and enrollments data
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Fetch owner information
-    let ownerInfo = { id: null, name: 'Unknown', email: null };
-    if (seminar.owner_id) {
-      const { data: owner, error: ownerError } = await serviceSupabase
-        .from('users')
-        .select('id, name, email')
-        .eq('id', seminar.owner_id)
-        .single();
-      
-      if (!ownerError && owner) {
-        ownerInfo = owner;
-        console.log('✅ Fetched owner info via service key');
-      } else {
-        console.error('❌ Error fetching owner info:', ownerError);
-      }
-    }
-
-    // Fetch enrollments information
-    let enrollments: any[] = [];
-    const { data: enrollmentData, error: enrollmentError } = await serviceSupabase
-      .from('enrollments')
-      .select('id, user_id, status, applied_at')
-      .eq('seminar_id', id);
-    
-    if (!enrollmentError && enrollmentData) {
-      enrollments = enrollmentData;
-      console.log('✅ Fetched enrollment info via service key:', enrollments.length, 'enrollments');
-    } else {
-      console.error('❌ Error fetching enrollment info:', enrollmentError);
-    }
-
-    // Check current user's enrollment status if authenticated
-    let currentUserEnrollment = null;
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token) {
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-        
-        if (!authError && user) {
-          // Find current user's enrollment
-          const userEnrollment = enrollments.find(e => e.user_id === user.id);
-          if (userEnrollment) {
-            currentUserEnrollment = {
-              status: userEnrollment.status,
-              applied_at: userEnrollment.applied_at
-            };
-          }
-        }
-      }
-    }
-
-    // Transform the data to match frontend expectations
+    // Transform data for better frontend consumption
     const transformedSeminar = {
-      id: seminar.id,
-      title: seminar.title,
-      description: seminar.description,
-      capacity: seminar.capacity,
-      owner: ownerInfo,
-      semester: {
-        id: seminar.semesters?.id,
-        name: seminar.semesters?.name || 'Unknown',
-        startDate: seminar.semesters?.start_date,
-        endDate: seminar.semesters?.end_date,
-        isActive: seminar.semesters?.is_active
+      ...seminar,
+      owner: {
+        id: seminar.owner_id,
+        name: seminar.users?.name || 'Unknown',
+        email: seminar.users?.email || 'Unknown',
       },
+      semester: {
+        name: seminar.semesters?.name || 'Unknown',
+        isActive: seminar.semesters?.is_active || false,
+      },
+      enrollments: {
+        total: seminar.enrollments?.length || 0,
+        approved: seminar.enrollments?.filter((e: any) => e.status === 'approved').length || 0,
+        pending: seminar.enrollments?.filter((e: any) => e.status === 'pending').length || 0,
+        rejected: seminar.enrollments?.filter((e: any) => e.status === 'rejected').length || 0,
+        list: seminar.enrollments?.map((e: any) => ({
+          id: e.id,
+          user_id: e.user_id,
+          status: e.status,
+          applied_at: e.applied_at,
+          user: {
+            name: e.users?.name || 'Unknown',
+            email: e.users?.email || 'Unknown',
+          }
+        })) || [],
+      },
+      // Ensure dates are properly formatted or null  
       startDate: seminar.start_date,
       endDate: seminar.end_date,
-      location: seminar.location,
-      tags: seminar.tags || [],
-      status: seminar.status,
       applicationStart: seminar.application_start,
       applicationEnd: seminar.application_end,
       applicationType: seminar.application_type,
-      enrollments: {
-        total: enrollments.length || 0,
-        approved: enrollments.filter(e => e.status === 'approved').length || 0,
-        pending: enrollments.filter(e => e.status === 'pending').length || 0,
-        rejected: enrollments.filter(e => e.status === 'rejected').length || 0
-      },
-      currentUserEnrollment,
-      sessions: seminar.sessions?.sort((a, b) => a.session_number - b.session_number) || [],
-      createdAt: seminar.created_at,
-      updatedAt: seminar.updated_at
+
+      sessions: seminar.sessions?.sort((a: any, b: any) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      ) || [],
+      
+      // Add current user enrollment status if user is authenticated
+      currentUserEnrollment: user ? seminar.enrollments?.find((e: any) => e.user_id === user.id) || null : null,
     };
+
+    // Remove the nested objects we've already transformed
+    delete transformedSeminar.users;
+    delete transformedSeminar.semesters;
+
+    console.log('✅ Seminar fetched successfully:', seminar.title);
 
     return NextResponse.json(transformedSeminar);
   } catch (error) {
-    console.error('API error:', error);
+    console.error('API Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -178,33 +128,18 @@ export async function PUT(
   try {
     const { id } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    console.log('📝 Updating seminar:', id);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
       return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check if user can edit this seminar
-    const { data: seminar, error: seminarError } = await authenticatedSupabase
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
       .select('owner_id')
       .eq('id', id)
@@ -215,7 +150,7 @@ export async function PUT(
     }
 
     // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -247,7 +182,7 @@ export async function PUT(
     if (updates.status !== undefined) updateData.status = updates.status;
 
     // Update seminar
-    const { data: updatedSeminar, error: updateError } = await authenticatedSupabase
+    const { data: updatedSeminar, error: updateError } = await supabase
       .from('seminars')
       .update(updateData)
       .eq('id', id)

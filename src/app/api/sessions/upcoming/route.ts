@@ -1,49 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      console.error('No authorization header provided');
-      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
-    }
-
-    // Extract token
-    const token = authHeader.replace('Bearer ', '');
-    if (!token) {
-      console.error('No token found in authorization header');
-      return NextResponse.json({ error: 'Invalid authorization header' }, { status: 401 });
-    }
-
-    // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError) {
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       console.error('Auth error:', authError);
-      return NextResponse.json({ error: 'Invalid token', details: authError.message }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    if (!user) {
-      console.error('No user found for token');
-      return NextResponse.json({ error: 'User not found' }, { status: 401 });
-    }
+    console.log('Fetching upcoming sessions for user:', user.id);
 
-    // Create an authenticated Supabase client using the user's token
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
-    // First, get the user's approved enrollments using authenticated client
-    const { data: enrollments, error: enrollmentError } = await authenticatedSupabase
+    // Get the user's approved enrollments
+    const { data: enrollments, error: enrollmentError } = await supabase
       .from('enrollments')
       .select('seminar_id')
       .eq('user_id', user.id)
@@ -67,8 +39,8 @@ export async function GET(request: NextRequest) {
     oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
     const oneWeekFromNowISO = oneWeekFromNow.toISOString();
 
-    // Get upcoming sessions for enrolled seminars (within 1 week) using authenticated client
-    const { data: sessions, error } = await authenticatedSupabase
+    // Get upcoming sessions for enrolled seminars (within 1 week)
+    const { data: sessions, error } = await supabase
       .from('sessions')
       .select(`
         *,

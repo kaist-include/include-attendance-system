@@ -20,11 +20,31 @@ export default function SeminarApplyPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    
     try {
       setSubmitting(true);
-      // TODO: API 연동
-      alert('신청이 접수되었습니다 (Mock)');
-      router.push(ROUTES.seminarDetail(id));
+      
+      const response = await fetch(`/api/seminars/${id}/enrollments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notes: memo.trim() || null
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(result.message || '신청이 완료되었습니다. 승인을 기다려주세요.');
+        router.push(ROUTES.seminarDetail(id));
+      } else {
+        alert(`신청 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      alert('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -35,13 +55,13 @@ export default function SeminarApplyPage() {
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-foreground">세미나 신청</h1>
-          <p className="text-muted-foreground mt-2">간단한 확인 후 신청을 완료하세요.</p>
+          <p className="text-muted-foreground mt-2">신청 후 세미나 개설자의 승인을 기다려주세요.</p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>신청 정보</CardTitle>
-            <CardDescription>제출 전 정보를 확인하세요</CardDescription>
+            <CardDescription>모든 신청은 세미나 개설자의 승인이 필요합니다</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={submit}>
@@ -50,12 +70,12 @@ export default function SeminarApplyPage() {
                 <input value={user?.email || ''} readOnly className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-muted text-foreground/80" />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground">메모(선택)</label>
+                <label className="text-sm font-medium text-foreground">신청 메모 (선택)</label>
                 <textarea
                   value={memo}
                   onChange={e => setMemo(e.target.value)}
                   className="mt-1 w-full min-h-24 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="간단한 소개나 요청사항이 있다면 적어주세요"
+                  placeholder="세미나 개설자에게 전달할 메시지나 간단한 자기소개를 적어주세요"
                 />
               </div>
               <div className="pt-2 flex gap-2">

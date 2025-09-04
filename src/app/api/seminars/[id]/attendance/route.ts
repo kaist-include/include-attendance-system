@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -9,38 +9,20 @@ export async function GET(
     const { id: seminarId } = await params;
     console.log('🔍 Attendance API called for seminar:', seminarId);
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      console.log('❌ No authorization header');
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
       console.log('❌ Auth error:', authError);
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     console.log('✅ User authenticated:', user.id);
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check if user can manage this seminar
     console.log('🔍 Checking seminar:', seminarId);
-    const { data: seminar, error: seminarError } = await authenticatedSupabase
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
       .select('owner_id, title')
       .eq('id', seminarId)
@@ -55,7 +37,7 @@ export async function GET(
 
     // Check permissions
     console.log('🔍 Checking user permissions for:', user.id);
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -76,7 +58,7 @@ export async function GET(
 
     // Get sessions for this seminar
     console.log('🔍 Fetching sessions for seminar:', seminarId);
-    const { data: sessions, error: sessionsError } = await authenticatedSupabase
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
       .select(`
         id,
@@ -101,7 +83,7 @@ export async function GET(
     console.log('🔍 Fetching enrolled users for seminar:', seminarId);
     
     // First, get enrollments
-    const { data: enrollments, error: enrollmentsError } = await authenticatedSupabase
+    const { data: enrollments, error: enrollmentsError } = await supabase
       .from('enrollments')
       .select('user_id, status')
       .eq('seminar_id', seminarId)
@@ -124,7 +106,7 @@ export async function GET(
       const userIds = enrollments.map(e => e.user_id);
       console.log('👥 Getting user details for IDs:', userIds);
       
-      const { data: users, error: usersError } = await authenticatedSupabase
+      const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id, name, email')
         .in('id', userIds);
@@ -155,7 +137,7 @@ export async function GET(
     let attendanceError = null;
     
     if (sessionIds.length > 0) {
-      const { data: attendanceData, error: attendanceErr } = await authenticatedSupabase
+      const { data: attendanceData, error: attendanceErr } = await supabase
         .from('attendances')
         .select(`
           user_id,
@@ -190,7 +172,10 @@ export async function GET(
         id: seminarId,
         title: seminar.title
       },
-      sessions: sessions || [],
+      sessions: sessions?.map(session => ({
+        ...session,
+        sessionNumber: session.session_number
+      })) || [],
       users: users,
       attendances: attendanceMap
     };

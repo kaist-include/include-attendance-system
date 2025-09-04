@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -8,33 +8,16 @@ export async function GET(
   try {
     const { id: seminarId, sessionId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check if session exists and user can manage it
-    const { data: session, error: sessionError } = await authenticatedSupabase
+    const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select(`
         *,
@@ -52,7 +35,7 @@ export async function GET(
     }
 
     // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -66,143 +49,89 @@ export async function GET(
     }
 
     // Get enrolled users with their attendance status for this session
-    console.log('🔍 Fetching enrolled users for seminar:', seminarId);
-    
-    // First, get enrollments
-    const { data: enrollments, error: enrollmentsError } = await authenticatedSupabase
+    const { data: enrollments, error: enrollmentsError } = await supabase
       .from('enrollments')
       .select('user_id, status')
       .eq('seminar_id', seminarId)
       .eq('status', 'approved');
 
     if (enrollmentsError) {
-      console.error('❌ Error fetching enrollments:', enrollmentsError);
-      return NextResponse.json({ 
-        error: 'Failed to fetch enrollments',
-        details: enrollmentsError.message
-      }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch enrollments' }, { status: 500 });
     }
 
-    // Then get user details for enrolled users
-    let enrolledUsers: any[] = [];
-    if (enrollments && enrollments.length > 0) {
-      const userIds = enrollments.map(e => e.user_id);
-      
-      const { data: users, error: usersError } = await authenticatedSupabase
-        .from('users')
-        .select('id, name, email')
-        .in('id', userIds);
+    // Get user details for enrolled users
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .in('id', enrollments.map((e: any) => e.user_id));
 
-      if (usersError) {
-        console.error('❌ Error fetching users:', usersError);
-        return NextResponse.json({ 
-          error: 'Failed to fetch user details',
-          details: usersError.message
-        }, { status: 500 });
-      }
-
-      // Combine enrollment and user data
-      enrolledUsers = enrollments.map(enrollment => ({
-        user_id: enrollment.user_id,
-        users: users?.find(user => user.id === enrollment.user_id)
-      })).filter(item => item.users);
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      return NextResponse.json({ error: 'Failed to fetch user details' }, { status: 500 });
     }
 
     // Get attendance records for this session
-    const { data: attendances, error: attendanceError } = await authenticatedSupabase
+    const { data: attendances, error: attendanceError } = await supabase
       .from('attendances')
-      .select(`
-        user_id,
-        status,
-        checked_at,
-        checked_by,
-        notes
-      `)
+      .select('*')
       .eq('session_id', sessionId);
 
     if (attendanceError) {
-      console.error('Error fetching attendances:', attendanceError);
-      return NextResponse.json({ error: 'Failed to fetch attendance records' }, { status: 500 });
+      console.error('Error fetching attendance:', attendanceError);
+      return NextResponse.json({ error: 'Failed to fetch attendance' }, { status: 500 });
     }
 
-    // Create attendance map
-    const attendanceMap: Record<string, any> = {};
-    attendances?.forEach(attendance => {
-      attendanceMap[attendance.user_id] = attendance;
-    });
-
-    // Merge user data with attendance status
-    const attendeesWithStatus = enrolledUsers?.map(enrollment => {
-      const user = enrollment.users;
-      const attendance = attendanceMap[user.id];
-      
+    // Combine the data
+    const attendanceList = users.map((user: any) => {
+      const attendance = attendances?.find((a: any) => a.user_id === user.id);
       return {
-        id: user.id,
+        id: user.id, // Use 'id' for React key prop
         name: user.name,
         email: user.email,
         status: attendance?.status || 'absent',
-        checkedAt: attendance?.checked_at || null,
-        checkedBy: attendance?.checked_by || null,
-        notes: attendance?.notes || null
+        checkedAt: attendance?.checked_at,
+        checkedBy: attendance?.checked_by,
+        notes: attendance?.notes
       };
-    }) || [];
+    });
 
     return NextResponse.json({
       session: {
         id: session.id,
-        title: session.title,
         sessionNumber: session.session_number,
+        title: session.title,
+        description: session.description,
         date: session.date,
-        durationMinutes: session.duration_minutes,
         location: session.location,
-        status: session.status
+        seminar: session.seminars
       },
-      seminar: {
-        id: seminarId,
-        title: session.seminars.title
-      },
-      attendees: attendeesWithStatus
+      attendees: attendanceList
     });
+
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Error in GET attendance/sessionId:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-export async function PUT(
+// Update attendance status for a student
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; sessionId: string }> }
 ) {
   try {
     const { id: seminarId, sessionId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check if session exists and user can manage it
-    const { data: session, error: sessionError } = await authenticatedSupabase
+    const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select(`
         *,
@@ -219,7 +148,7 @@ export async function PUT(
     }
 
     // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -241,14 +170,16 @@ export async function PUT(
       }, { status: 400 });
     }
 
-    if (!['present', 'absent', 'late', 'excused'].includes(status)) {
+    // Validate status
+    const validStatuses = ['present', 'absent', 'late', 'excused'];
+    if (!validStatuses.includes(status)) {
       return NextResponse.json({ 
-        error: 'Invalid status. Must be one of: present, absent, late, excused' 
+        error: 'Invalid status. Must be one of: ' + validStatuses.join(', ')
       }, { status: 400 });
     }
 
     // Check if user is enrolled in the seminar
-    const { data: enrollment, error: enrollmentError } = await authenticatedSupabase
+    const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
       .select('id')
       .eq('user_id', userId)
@@ -260,23 +191,51 @@ export async function PUT(
       return NextResponse.json({ error: 'User is not enrolled in this seminar' }, { status: 400 });
     }
 
-    // Upsert attendance record
-    const attendanceData = {
-      user_id: userId,
-      session_id: sessionId,
-      status,
-      checked_at: new Date().toISOString(),
-      checked_by: user.id,
-      notes: notes || null
-    };
-
-    const { data: attendance, error: attendanceError } = await authenticatedSupabase
+    // Check if attendance record already exists
+    const { data: existingAttendance } = await supabase
       .from('attendances')
-      .upsert(attendanceData, {
-        onConflict: 'user_id,session_id'
-      })
-      .select()
+      .select('id')
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
       .single();
+
+    let attendance, attendanceError;
+
+    if (existingAttendance) {
+      // Update existing record
+      const result = await supabase
+        .from('attendances')
+        .update({
+          status: status,
+          checked_at: new Date().toISOString(),
+          checked_by: user.id,
+          notes: notes || null
+        })
+        .eq('user_id', userId)
+        .eq('session_id', sessionId)
+        .select()
+        .single();
+      
+      attendance = result.data;
+      attendanceError = result.error;
+    } else {
+      // Insert new record
+      const result = await supabase
+        .from('attendances')
+        .insert({
+          user_id: userId,
+          session_id: sessionId,
+          status: status,
+          checked_at: new Date().toISOString(),
+          checked_by: user.id,
+          notes: notes || null
+        })
+        .select()
+        .single();
+      
+      attendance = result.data;
+      attendanceError = result.error;
+    }
 
     if (attendanceError) {
       console.error('Error updating attendance:', attendanceError);
@@ -284,8 +243,9 @@ export async function PUT(
     }
 
     return NextResponse.json(attendance);
+
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Error in POST attendance/sessionId:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

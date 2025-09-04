@@ -6,27 +6,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
+import { getAvailableSemesters, getDefaultSemester } from '@/lib/utils';
 
 export default function CreateSeminarPage() {
   const { user } = useRequireAuth();
-  const { isAdmin, isSeminarLeader } = useAuth();
 
   const [form, setForm] = useState({
     title: '',
     description: '',
-    capacity: DEFAULTS.seminarCapacity,
-    semester: '2025-1',
+    capacity: DEFAULTS.seminarCapacity as number,
+    semester: getDefaultSemester(),
     start_date: '',
     end_date: '',
     application_start: '',
     application_end: '',
     location: '',
-    application_type: 'first_come' as const,
+    application_type: 'selection' as 'first_come' | 'selection',
     tags: [] as string[],
     tagInput: '',
   });
 
-  // Role protection is handled by useRequireRole; no need to locally disable the button
+  // Anyone can create seminars, but only the creator can manage them
 
   const addTag = () => {
     const t = form.tagInput.trim();
@@ -40,16 +40,51 @@ export default function CreateSeminarPage() {
     setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }));
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.description || !form.start_date || !form.application_start) return;
-    if (!(isAdmin || isSeminarLeader)) {
-      alert('세미나를 개설할 권한이 없습니다. 관리자 또는 세미나 리더에게 문의하세요.');
-      return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch('/api/seminars', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          capacity: form.capacity,
+          semester: form.semester,
+          start_date: form.start_date,
+          end_date: form.end_date || null,
+          location: form.location || null,
+          application_type: form.application_type,
+          application_start: new Date(form.application_start + 'T00:00:00.000Z').toISOString(),
+          application_end: form.application_end ? 
+            new Date(form.application_end + 'T23:59:59.999Z').toISOString() :
+            new Date(form.application_start + 'T23:59:59.999Z').toISOString(),
+          tags: form.tags,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert('세미나가 생성되었습니다!');
+        window.location.href = ROUTES.seminars;
+      } else {
+        alert(`오류가 발생했습니다: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error creating seminar:', error);
+      alert('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
     }
-    // Here we would call API to create the seminar
-    alert('세미나가 생성되었습니다 (Mock)');
-    window.location.href = ROUTES.seminars;
   };
 
   return (
@@ -112,11 +147,11 @@ export default function CreateSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="2024-1">2024년 봄학기</option>
-                    <option value="2024-2">2024년 가을학기</option>
-                    <option value="2025-1">2025년 봄학기</option>
-                    <option value="2025-summer">2025년 여름학기</option>
-                    <option value="2025-fall">2025년 가을학기</option>
+                    {getAvailableSemesters().map((semesterOption) => (
+                      <option key={semesterOption.value} value={semesterOption.value}>
+                        {semesterOption.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -174,23 +209,11 @@ export default function CreateSeminarPage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground">신청 방식</label>
-                  <div className="mt-2 flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={form.application_type === 'first_come'}
-                        onChange={() => setForm(f => ({ ...f, application_type: 'first_come' }))}
-                      />
-                      선착순
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={form.application_type === 'selection'}
-                        onChange={() => setForm(f => ({ ...f, application_type: 'selection' }))}
-                      />
-                      선발제
-                    </label>
+                  <div className="mt-2 p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      📝 모든 세미나는 <strong>Owner 승인 방식</strong>입니다<br/>
+                      신청자는 신청 후 세미나 개설자의 승인을 받아야 합니다
+                    </p>
                   </div>
                 </div>
 
@@ -222,7 +245,9 @@ export default function CreateSeminarPage() {
               </div>
 
               <div className="pt-2">
-                <Button type="submit">세미나 생성</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? '생성 중...' : '세미나 생성'}
+                </Button>
               </div>
             </form>
           </CardContent>

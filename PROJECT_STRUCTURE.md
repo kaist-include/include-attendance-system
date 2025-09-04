@@ -9,16 +9,21 @@ include-attendance-system/
 │   │   ├── (auth)/            # Auth 그룹 라우트
 │   │   │   ├── login/         # 로그인 페이지
 │   │   │   └── register/      # 회원가입 페이지
-│   │   ├── (dashboard)/       # 대시보드 그룹 라우트
-│   │   │   └── dashboard/     # 메인 대시보드
+│   │   ├── dashboard/         # 메인 대시보드 페이지
 │   │   ├── seminars/          # 세미나 관련 페이지
 │   │   │   └── [id]/          # 세미나 상세 페이지
 │   │   ├── admin/             # 관리자 페이지
+│   │   ├── profile/           # 프로필 페이지
+│   │   ├── settings/          # 설정 페이지
+│   │   ├── error/             # 에러 페이지
+│   │   ├── auth/              # 인증 관련 서버 액션
 │   │   ├── api/               # API 라우트
 │   │   │   ├── auth/          # 인증 API
 │   │   │   ├── seminars/      # 세미나 API
 │   │   │   ├── users/         # 사용자 API
-│   │   │   └── attendance/    # 출석 API
+│   │   │   ├── sessions/      # 세션 API
+│   │   │   ├── admin/         # 관리자 API
+│   │   │   └── debug/         # 디버그 API
 │   │   ├── layout.tsx         # 루트 레이아웃
 │   │   ├── page.tsx           # 홈 페이지
 │   │   └── globals.css        # 글로벌 스타일

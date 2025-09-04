@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase, getCurrentUser, signOut } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Profile, UserRole } from '@/types';
 import { getErrorMessage } from '@/lib/utils';
 
@@ -11,13 +11,9 @@ interface AuthContextType {
   profile: Profile | null;
   userRole: UserRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
-  signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isAdmin: boolean;
-  isSeminarLeader: boolean;
   error: string | null;
 }
 
@@ -38,57 +34,10 @@ export const useAuthProvider = (): AuthContextType => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          if (session?.user) {
-            setUser(session.user);
-            await loadUserData(session.user.id);
-          }
-          setLoading(false);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(getErrorMessage(err));
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          await loadUserData(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setUserRole(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
   // Load user data (both profile and role)
-  const loadUserData = async (userId: string) => {
+  const loadUserData = useCallback(async (userId: string) => {
+    const supabase = createClient();
+    
     try {
       // Load user role from users table
       const { data: userData, error: userError } = await supabase
@@ -179,72 +128,66 @@ export const useAuthProvider = (): AuthContextType => {
       console.error('Error loading user data:', err);
       setError(getErrorMessage(err));
     }
-  };
+  }, [user?.user_metadata?.name]);
 
-  // Sign in
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Initialize auth state
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          if (session?.user) {
+            setUser(session.user);
+            await loadUserData(session.user.id);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(getErrorMessage(err));
+          setLoading(false);
+        }
+      }
+    };
 
-      if (error) throw error;
+    initializeAuth();
 
-      // User data will be loaded automatically by the auth state change listener
-    } catch (err) {
-      setError(getErrorMessage(err));
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) return;
 
-  // Sign up
-  const signUp = async (email: string, password: string, name: string) => {
-    try {
-      setLoading(true);
-      setError(null);
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
+          // Use setTimeout to defer async operations and prevent deadlock
+          setTimeout(async () => {
+          await loadUserData(session.user.id);
+          }, 0);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setProfile(null);
+          setUserRole(null);
+        }
+        
+        setLoading(false);
+      }
+    );
 
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
-      });
-
-      if (error) throw error;
-    } catch (err) {
-      setError(getErrorMessage(err));
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Sign out
-  const handleSignOut = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      await signOut();
-    } catch (err) {
-      setError(getErrorMessage(err));
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [loadUserData]);
 
   // Update profile
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user || !profile) throw new Error('User not authenticated');
+    
+    const supabase = createClient();
 
     try {
       setError(null);
@@ -274,28 +217,20 @@ export const useAuthProvider = (): AuthContextType => {
     // Admin has access to everything
     if (userRole === 'admin') return true;
     
-    // Seminar leaders have access to seminar_leader and member roles
-    if (userRole === 'seminar_leader' && (role === 'seminar_leader' || role === 'member')) return true;
-    
     // Check exact role match
     return userRole === role;
   };
 
   const isAdmin = userRole === 'admin';
-  const isSeminarLeader = userRole === 'seminar_leader' || isAdmin;
 
   return {
     user,
     profile,
     userRole,
     loading,
-    signIn,
-    signUp,
-    signOut: handleSignOut,
     updateProfile,
     hasRole,
     isAdmin,
-    isSeminarLeader,
     error,
   };
 };

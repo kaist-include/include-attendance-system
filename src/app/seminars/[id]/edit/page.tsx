@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
-import { useAuth, useRequireRole } from '@/hooks/useAuth';
+import { getAvailableSemesters, formatSemesterLabel } from '@/lib/utils';
 
 export default function EditSeminarPage() {
-  useRequireRole('seminar_leader');
-  const { isAdmin, isSeminarLeader } = useAuth();
+  // No role requirement - ownership will be checked via API
+  const { isAdmin } = useAuth();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -18,19 +19,19 @@ export default function EditSeminarPage() {
   const [form, setForm] = useState({
     title: '세미나 제목',
     description: '세미나 설명',
-    capacity: DEFAULTS.seminarCapacity,
+    capacity: DEFAULTS.seminarCapacity as number,
     semester: '2025-1',
     start_date: '2025-01-15',
     end_date: '2025-03-15',
     application_start: '2024-12-20',
     application_end: '2025-01-20',
     location: 'KAIST',
-    application_type: 'first_come' as const,
+    application_type: 'selection' as 'first_come' | 'selection',
     tags: ['기초'] as string[],
     tagInput: '',
   });
 
-  const canEdit = isAdmin || isSeminarLeader;
+  // canEdit will be determined by API ownership check
 
   const addTag = () => {
     const t = form.tagInput.trim();
@@ -46,7 +47,7 @@ export default function EditSeminarPage() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canEdit) return;
+    // API will handle permission checking
     // Here we would call API to update the seminar
     alert('세미나가 수정되었습니다 (Mock)');
     router.push(ROUTES.seminarDetail(id || ''));
@@ -110,11 +111,11 @@ export default function EditSeminarPage() {
                     onChange={e => setForm(f => ({ ...f, semester: e.target.value }))}
                     className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="2024-1">2024년 봄학기</option>
-                    <option value="2024-2">2024년 가을학기</option>
-                    <option value="2025-1">2025년 봄학기</option>
-                    <option value="2025-summer">2025년 여름학기</option>
-                    <option value="2025-fall">2025년 가을학기</option>
+                    {getAvailableSemesters().map((semesterOption) => (
+                      <option key={semesterOption.value} value={semesterOption.value}>
+                        {semesterOption.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -171,23 +172,11 @@ export default function EditSeminarPage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground">신청 방식</label>
-                  <div className="mt-2 flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={form.application_type === 'first_come'}
-                        onChange={() => setForm(f => ({ ...f, application_type: 'first_come' }))}
-                      />
-                      선착순
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={form.application_type === 'selection'}
-                        onChange={() => setForm(f => ({ ...f, application_type: 'selection' }))}
-                      />
-                      선발제
-                    </label>
+                  <div className="mt-2 p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      📝 모든 세미나는 <strong>Owner 승인 방식</strong>입니다<br/>
+                      신청자는 신청 후 세미나 개설자의 승인을 받아야 합니다
+                    </p>
                   </div>
                 </div>
 
@@ -214,7 +203,7 @@ export default function EditSeminarPage() {
               </div>
 
               <div className="pt-2 flex gap-2">
-                <Button type="submit" disabled={!canEdit}>저장</Button>
+                <Button type="submit">저장</Button>
                 <Button type="button" variant="outline" onClick={() => router.push(ROUTES.seminarDetail(id || ''))}>취소</Button>
               </div>
             </form>

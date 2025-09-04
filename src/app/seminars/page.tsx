@@ -8,7 +8,8 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/config/constants';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+import { formatSemesterLabel } from '@/lib/utils';
 
 interface Seminar {
   id: string;
@@ -24,6 +25,13 @@ interface Seminar {
   status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
   sessions: number;
   semester: string;
+  applicationStart: string;
+  applicationEnd: string;
+  applicationType: 'first_come' | 'selection';
+  currentUserEnrollment: {
+    status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+    applied_at: string;
+  } | null;
 }
 
 const statusLabels = {
@@ -81,18 +89,10 @@ export default function SeminarsPage() {
           params.append('tags', selectedTags.join(','));
         }
 
-        // Get session for authentication (optional - seminars should work without auth too)
-        const { data: sessionData } = await supabase.auth.getSession();
-        const session = sessionData?.session;
-        
+        // With SSR middleware, auth is handled automatically
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
         };
-        
-        // Add auth header if user is logged in
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
         
         const response = await fetch(`/api/seminars?${params.toString()}`, {
           method: 'GET',
@@ -101,13 +101,21 @@ export default function SeminarsPage() {
         
         if (response.ok) {
           const data = await response.json();
+          // Ensure data is an array
+          if (Array.isArray(data)) {
           setSeminars(data);
+          } else {
+            console.error('API returned non-array data:', data);
+            setSeminars([]);
+          }
         } else {
           const errorText = await response.text();
           console.error('Failed to fetch seminars:', response.status, errorText);
+          setSeminars([]); // Ensure we have an empty array on error
         }
       } catch (error) {
         console.error('Error fetching seminars:', error);
+        setSeminars([]); // Ensure we have an empty array on error
       } finally {
         setLoading(false);
       }
@@ -116,12 +124,12 @@ export default function SeminarsPage() {
     fetchSeminars();
   }, [statusFilter, searchTerm, selectedTags]);
 
-  // 모든 태그 수집
-  const allTags = Array.from(new Set(seminars.flatMap(seminar => seminar.tags)));
-  const allSemesters = Array.from(new Set(seminars.map(seminar => (seminar as any).semester).filter(Boolean)));
+  // 모든 태그 수집 - with safe array check
+  const allTags = Array.from(new Set((seminars || []).flatMap(seminar => seminar.tags || [])));
+  const allSemesters = Array.from(new Set((seminars || []).map(seminar => (seminar as any).semester).filter(Boolean)));
 
   // Client-side filtering is now done by the API, but we keep this for immediate UI feedback
-  const filteredSeminars = seminars.filter(seminar => {
+  const filteredSeminars = (seminars || []).filter(seminar => {
     const matchesSemester = semesterFilter === 'all' || (seminar as any).semester === semesterFilter;
     return matchesSemester;
   });
@@ -144,6 +152,24 @@ export default function SeminarsPage() {
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     );
+  };
+
+  // Helper function to check if application is open
+  const isApplicationOpen = (seminar: Seminar) => {
+    const now = new Date();
+    const appStart = new Date(seminar.applicationStart);
+    const appEnd = new Date(seminar.applicationEnd);
+    return now >= appStart && now <= appEnd;
+  };
+
+  // Helper function to check if user can apply
+  const canUserApply = (seminar: Seminar) => {
+    if (!user) return false;
+    if (seminar.currentUserEnrollment) return false; // Already applied/enrolled
+    if (seminar.enrolled >= seminar.capacity) return false; // Full capacity
+    if (seminar.status !== 'recruiting') return false; // Not recruiting
+    if (!isApplicationOpen(seminar)) return false; // Application period closed
+    return true;
   };
 
   return (
@@ -190,11 +216,11 @@ export default function SeminarsPage() {
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
                   >
-                    <option value="all">모든 상태</option>
-                    <option value="draft">준비중</option>
-                    <option value="in_progress">진행중</option>
-                    <option value="completed">완료</option>
-                    <option value="cancelled">취소</option>
+                    <option key="all-status" value="all">모든 상태</option>
+                    <option key="draft" value="draft">준비중</option>
+                    <option key="in_progress" value="in_progress">진행중</option>
+                    <option key="completed" value="completed">완료</option>
+                    <option key="cancelled" value="cancelled">취소</option>
                   </select>
                 </div>
 
@@ -206,7 +232,7 @@ export default function SeminarsPage() {
                     onChange={(e) => setSemesterFilter(e.target.value)}
                     className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
                   >
-                    <option value="all">모든 학기</option>
+                    <option key="all-semester" value="all">모든 학기</option>
                     {allSemesters.map(sem => (
                       <option key={sem} value={sem}>{sem}</option>
                     ))}
@@ -266,8 +292,12 @@ export default function SeminarsPage() {
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4 mr-2" />
                     <span>
-                      {new Date(seminar.startDate).toLocaleDateString('ko-KR')} ~ {' '}
-                      {seminar.endDate ? new Date(seminar.endDate).toLocaleDateString('ko-KR') : '진행중'}
+                      {seminar.startDate 
+                        ? new Date(seminar.startDate).toLocaleDateString('ko-KR') 
+                        : '시작일 미정'} ~ {' '}
+                      {seminar.endDate 
+                        ? new Date(seminar.endDate).toLocaleDateString('ko-KR') 
+                        : '진행중'}
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
@@ -280,7 +310,16 @@ export default function SeminarsPage() {
                   </div>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Users className="w-4 h-4 mr-2" />
-                    <span>학기: <span className="font-medium text-foreground/90">{seminar.semester}</span></span>
+                    <span>학기: <span className="font-medium text-foreground/90">{formatSemesterLabel(seminar.semester)}</span></span>
+                  </div>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <GraduationCap className="w-4 h-4 mr-2" />
+                    <span>
+                      신청: {new Date(seminar.applicationStart).toLocaleDateString('ko-KR')} ~ {new Date(seminar.applicationEnd).toLocaleDateString('ko-KR')}
+                      {isApplicationOpen(seminar) && (
+                        <span className="ml-2 text-green-600 font-medium">• 신청 가능</span>
+                      )}
+                    </span>
                   </div>
                 </div>
 
@@ -324,18 +363,50 @@ export default function SeminarsPage() {
                       상세보기
                     </Button>
                   </Link>
-                  {user && seminar.status === 'recruiting' && seminar.enrolled < seminar.capacity && (
-                    <Link href={ROUTES.applySeminar(seminar.id.toString())} className="flex-1">
-                      <Button className="w-full">
-                        신청하기
-                      </Button>
-                    </Link>
-                  )}
-                  {user && seminar.status === 'recruiting' && seminar.enrolled >= seminar.capacity && (
-                    <Button variant="secondary" className="flex-1" disabled>
-                      정원 마감
-                    </Button>
-                  )}
+                  {user && (() => {
+                    // Show different buttons based on user's status and application conditions
+                    if (seminar.currentUserEnrollment) {
+                      // User already applied/enrolled
+                      switch (seminar.currentUserEnrollment.status) {
+                        case 'pending':
+                          return <Button variant="secondary" className="flex-1" disabled>승인 대기중</Button>;
+                        case 'approved':
+                          return <Button variant="outline" className="flex-1" disabled>수강중</Button>;
+                        case 'rejected':
+                          return <Button variant="destructive" className="flex-1" disabled>신청 거절</Button>;
+                        case 'cancelled':
+                          return <Button variant="secondary" className="flex-1" disabled>신청 취소</Button>;
+                      }
+                                         } else if (canUserApply(seminar)) {
+                       // User can apply - now all applications require owner approval
+                       return (
+                         <div className="flex-1 flex flex-col gap-1">
+                           <Link href={ROUTES.applySeminar(seminar.id.toString())} className="w-full">
+                             <Button className="w-full">신청하기</Button>
+                           </Link>
+                           <p className="text-xs text-muted-foreground text-center">승인 방식</p>
+                         </div>
+                       );
+                    } else if (seminar.enrolled >= seminar.capacity) {
+                      // Full capacity
+                      return <Button variant="secondary" className="flex-1" disabled>정원 마감</Button>;
+                    } else if (!isApplicationOpen(seminar)) {
+                      // Application period closed
+                      const now = new Date();
+                      const appStart = new Date(seminar.applicationStart);
+                      const appEnd = new Date(seminar.applicationEnd);
+                      
+                      if (now < appStart) {
+                        return <Button variant="secondary" className="flex-1" disabled>신청 예정</Button>;
+                      } else {
+                        return <Button variant="secondary" className="flex-1" disabled>신청 마감</Button>;
+                      }
+                    } else if (seminar.status !== 'recruiting') {
+                      // Not recruiting
+                      return <Button variant="secondary" className="flex-1" disabled>신청 불가</Button>;
+                    }
+                    return null;
+                  })()}
                 </div>
               </CardContent>
             </Card>

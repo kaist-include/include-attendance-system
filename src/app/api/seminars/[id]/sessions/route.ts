@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 // Helper function to recalculate seminar start/end dates based on sessions
-async function updateSeminarDates(seminarId: string, authenticatedSupabase: any) {
+async function updateSeminarDates(seminarId: string, supabase: any) {
   try {
     // Get all sessions for this seminar
-    const { data: sessions, error: sessionsError } = await authenticatedSupabase
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
       .select('date')
       .eq('seminar_id', seminarId)
@@ -37,7 +37,7 @@ async function updateSeminarDates(seminarId: string, authenticatedSupabase: any)
     }
 
     // Update seminar with calculated dates
-    const { error: updateError } = await authenticatedSupabase
+    const { error: updateError } = await supabase
       .from('seminars')
       .update(updateData)
       .eq('id', seminarId);
@@ -59,33 +59,16 @@ export async function POST(
   try {
     const { id: seminarId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
     // Check if user can manage this seminar
-    const { data: seminar, error: seminarError } = await authenticatedSupabase
+    const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
       .select('owner_id')
       .eq('id', seminarId)
@@ -96,7 +79,7 @@ export async function POST(
     }
 
     // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -119,7 +102,7 @@ export async function POST(
     }
 
     // Get the next session number
-    const { data: lastSession } = await authenticatedSupabase
+    const { data: lastSession } = await supabase
       .from('sessions')
       .select('session_number')
       .eq('seminar_id', seminarId)
@@ -130,7 +113,7 @@ export async function POST(
     const nextSessionNumber = (lastSession?.session_number || 0) + 1;
 
     // Create session
-    const { data: newSession, error: sessionError } = await authenticatedSupabase
+    const { data: newSession, error: sessionError } = await supabase
       .from('sessions')
       .insert({
         seminar_id: seminarId,
@@ -151,7 +134,7 @@ export async function POST(
     }
 
     // Recalculate seminar start/end dates based on all sessions
-    await updateSeminarDates(seminarId, authenticatedSupabase);
+    await updateSeminarDates(seminarId, supabase);
 
     return NextResponse.json(newSession, { status: 201 });
   } catch (error) {

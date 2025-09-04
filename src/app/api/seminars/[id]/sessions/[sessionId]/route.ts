@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 // Helper function to recalculate seminar start/end dates based on sessions
-async function updateSeminarDates(seminarId: string, authenticatedSupabase: any) {
+async function recalculateSeminarDates(seminarId: string, supabase: any) {
   try {
-    // Get all sessions for this seminar
-    const { data: sessions, error: sessionsError } = await authenticatedSupabase
+    console.log('🔄 Recalculating dates for seminar:', seminarId);
+    
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
       .select('date')
       .eq('seminar_id', seminarId)
@@ -16,39 +17,83 @@ async function updateSeminarDates(seminarId: string, authenticatedSupabase: any)
       return;
     }
 
-    let updateData: any = {};
-
     if (sessions && sessions.length > 0) {
-      // Calculate start and end dates from sessions
-      const sessionDates = sessions.map((s: { date: string }) => new Date(s.date));
-      const startDate = new Date(Math.min(...sessionDates.map((d: Date) => d.getTime())));
-      const endDate = new Date(Math.max(...sessionDates.map((d: Date) => d.getTime())));
-
-      updateData.start_date = startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-      updateData.end_date = endDate.toISOString().split('T')[0];
+      const startDate = sessions[0].date;
+      const endDate = sessions[sessions.length - 1].date;
       
-      console.log(`📅 Updating seminar dates: ${updateData.start_date} to ${updateData.end_date}`);
-    } else {
-      // No sessions, clear the dates
-      updateData.start_date = null;
-      updateData.end_date = null;
+      console.log('📅 Updating seminar dates:', { startDate, endDate });
       
-      console.log('📅 No sessions found, clearing seminar dates');
-    }
-
-    // Update seminar with calculated dates
-    const { error: updateError } = await authenticatedSupabase
+      const { error: updateError } = await supabase
       .from('seminars')
-      .update(updateData)
+        .update({
+          start_date: startDate,
+          end_date: endDate,
+          updated_at: new Date().toISOString()
+        })
       .eq('id', seminarId);
 
     if (updateError) {
       console.error('Error updating seminar dates:', updateError);
     } else {
       console.log('✅ Successfully updated seminar dates');
+      }
     }
   } catch (error) {
-    console.error('Error in updateSeminarDates:', error);
+    console.error('Error in recalculateSeminarDates:', error);
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; sessionId: string }> }
+) {
+  try {
+    const { id: seminarId, sessionId } = await params;
+
+    console.log('📖 Fetching session details for seminar:', seminarId, 'session:', sessionId);
+
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Get session details
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .select(`
+        *,
+        seminars (
+          title,
+          description,
+          owner_id,
+          semesters (
+            name,
+            is_active
+          )
+        )
+      `)
+      .eq('id', sessionId)
+      .eq('seminar_id', seminarId)
+      .single();
+
+    if (error) {
+      console.error('Session fetch error:', error);
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    console.log('✅ Session found:', session.title);
+
+    return NextResponse.json(session);
+  } catch (error) {
+    console.error('API Error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -59,97 +104,85 @@ export async function PUT(
   try {
     const { id: seminarId, sessionId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    console.log('📝 Updating session:', sessionId, 'for seminar:', seminarId);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
+    const body = await request.json();
+    
+    // Validate required fields
+    if (!body.title || !body.date || !body.location) {
+      return NextResponse.json(
+        { error: 'Title, date, and location are required' }, 
+        { status: 400 }
+      );
+    }
 
-    // Check if session exists and user can manage it
-    const { data: session, error: sessionError } = await authenticatedSupabase
-      .from('sessions')
-      .select(`
-        *,
-        seminars!inner (
-          owner_id
-        )
-      `)
-      .eq('id', sessionId)
-      .eq('seminar_id', seminarId)
+    // Verify user owns the seminar or has admin role
+    const { data: seminar, error: seminarError } = await supabase
+      .from('seminars')
+      .select('owner_id')
+      .eq('id', seminarId)
       .single();
 
-    if (sessionError || !session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    if (seminarError || !seminar) {
+      return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
     }
 
-    // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    // Get user role to check permissions
+    const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    const isOwner = session.seminars.owner_id === user.id;
-    const isAdmin = userRecord?.role === 'admin';
+    const isAdmin = userProfile?.role === 'admin';
+    const isOwner = seminar.owner_id === user.id;
 
     if (!isOwner && !isAdmin) {
-      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Parse request body
-    const updates = await request.json();
-    
-    // Prepare update object
-    const updateData: any = {};
-    
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.date !== undefined) updateData.date = updates.date;
-    if (updates.duration_minutes !== undefined) updateData.duration_minutes = updates.duration_minutes;
-    if (updates.location !== undefined) updateData.location = updates.location;
-    if (updates.materials_url !== undefined) updateData.materials_url = updates.materials_url;
-    if (updates.status !== undefined) updateData.status = updates.status;
+    console.log('👤 User authorized to update session');
 
     // Update session
-    const { data: updatedSession, error: updateError } = await authenticatedSupabase
+    const { data: updatedSession, error: updateError } = await supabase
       .from('sessions')
-      .update(updateData)
+      .update({
+        title: body.title,
+        date: body.date,
+        location: body.location,
+        description: body.description,
+        session_number: body.session_number,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', sessionId)
+      .eq('seminar_id', seminarId)
       .select()
       .single();
 
     if (updateError) {
-      console.error('Error updating session:', updateError);
+      console.error('Session update error:', updateError);
       return NextResponse.json({ error: 'Failed to update session' }, { status: 500 });
     }
 
-    // Recalculate seminar start/end dates if date was updated
-    if (updates.date !== undefined) {
-      await updateSeminarDates(seminarId, authenticatedSupabase);
-    }
+    console.log('✅ Session updated successfully');
 
-    return NextResponse.json(updatedSession);
+    // Recalculate seminar dates after session update
+    await recalculateSeminarDates(seminarId, supabase);
+
+    return NextResponse.json({ 
+      message: 'Session updated successfully', 
+      session: updatedSession 
+    });
   } catch (error) {
-    console.error('API error:', error);
+    console.error('API Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -161,79 +194,63 @@ export async function DELETE(
   try {
     const { id: seminarId, sessionId } = await params;
     
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
+    console.log('🗑️ Deleting session:', sessionId, 'for seminar:', seminarId);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // Create authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
-
-    // Check if session exists and user can manage it
-    const { data: session, error: sessionError } = await authenticatedSupabase
-      .from('sessions')
-      .select(`
-        *,
-        seminars!inner (
-          owner_id
-        )
-      `)
-      .eq('id', sessionId)
-      .eq('seminar_id', seminarId)
+    // Verify user owns the seminar or has admin role
+    const { data: seminar, error: seminarError } = await supabase
+      .from('seminars')
+      .select('owner_id')
+      .eq('id', seminarId)
       .single();
 
-    if (sessionError || !session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    if (seminarError || !seminar) {
+      return NextResponse.json({ error: 'Seminar not found' }, { status: 404 });
     }
 
-    // Check permissions
-    const { data: userRecord, error: userError } = await authenticatedSupabase
+    // Get user role to check permissions
+    const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    const isOwner = session.seminars.owner_id === user.id;
-    const isAdmin = userRecord?.role === 'admin';
+    const isAdmin = userProfile?.role === 'admin';
+    const isOwner = seminar.owner_id === user.id;
 
     if (!isOwner && !isAdmin) {
-      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    console.log('👤 User authorized to delete session');
+
     // Delete session
-    const { error: deleteError } = await authenticatedSupabase
+    const { error: deleteError } = await supabase
       .from('sessions')
       .delete()
-      .eq('id', sessionId);
+      .eq('id', sessionId)
+      .eq('seminar_id', seminarId);
 
     if (deleteError) {
-      console.error('Error deleting session:', deleteError);
+      console.error('Session deletion error:', deleteError);
       return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
     }
 
-    // Recalculate seminar start/end dates after deletion
-    await updateSeminarDates(seminarId, authenticatedSupabase);
+    console.log('✅ Session deleted successfully');
+
+    // Recalculate seminar dates after session deletion
+    await recalculateSeminarDates(seminarId, supabase);
 
     return NextResponse.json({ message: 'Session deleted successfully' });
   } catch (error) {
-    console.error('API error:', error);
+    console.error('API Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 // Helper function to recalculate seminar start/end dates based on sessions
-async function updateSeminarDates(seminarId: string, serviceSupabase: any) {
+async function updateSeminarDates(seminarId: string, supabase: any) {
   try {
     // Get all sessions for this seminar
-    const { data: sessions, error: sessionsError } = await serviceSupabase
+    const { data: sessions, error: sessionsError } = await supabase
       .from('sessions')
       .select('date')
       .eq('seminar_id', seminarId)
@@ -37,7 +37,7 @@ async function updateSeminarDates(seminarId: string, serviceSupabase: any) {
     }
 
     // Update seminar with calculated dates
-    const { error: updateError } = await serviceSupabase
+    const { error: updateError } = await supabase
       .from('seminars')
       .update(updateData)
       .eq('id', seminarId);
@@ -49,104 +49,83 @@ async function updateSeminarDates(seminarId: string, serviceSupabase: any) {
 
     return { 
       success: true, 
-      seminarId, 
-      startDate: updateData.start_date, 
-      endDate: updateData.end_date,
-      sessionCount: sessions?.length || 0
+      seminarId,
+      updatedDates: updateData
     };
   } catch (error) {
-    console.error(`Error in updateSeminarDates for ${seminarId}:`, error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    console.error('Error in updateSeminarDates:', error);
+    return { success: false, error: 'Internal server error' };
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Get authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
+    console.log('🔄 Admin: Recalculating all seminar dates');
+
+    // Get authenticated user from session (handled by middleware)
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Use service client for the operations
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Check if this is the service key (admin bypass)
-    const isServiceKey = token === supabaseServiceKey;
-    
-    if (!isServiceKey) {
-      // If not service key, check user auth
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      
-      if (authError || !user) {
-        return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
-      }
+    // Check if user is admin
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
 
-      // Check if user is admin
-      const { data: currentUser } = await serviceSupabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (!currentUser || currentUser.role !== 'admin') {
-        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-      }
+    if (userError || !currentUser || currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    console.log('🔄 Starting seminar date recalculation for all seminars...');
+    console.log('✅ Admin verified, proceeding with recalculation');
 
     // Get all seminars
-    const { data: seminars, error: seminarsError } = await serviceSupabase
+    const { data: seminars, error: seminarsError } = await supabase
       .from('seminars')
       .select('id, title');
 
     if (seminarsError) {
-      console.error('Error fetching seminars:', seminarsError);
+      console.error('❌ Error fetching seminars:', seminarsError);
       return NextResponse.json({ error: 'Failed to fetch seminars' }, { status: 500 });
     }
 
-    console.log(`📊 Found ${seminars?.length || 0} seminars to process`);
+    console.log(`📊 Found ${seminars?.length || 0} seminars to update`);
 
     const results = [];
-    let successCount = 0;
-    let errorCount = 0;
 
-    // Process each seminar
+    // Update each seminar
     for (const seminar of seminars || []) {
-      const result = await updateSeminarDates(seminar.id, serviceSupabase);
+      console.log(`🔄 Processing seminar: ${seminar.title} (${seminar.id})`);
+      
+      const result = await updateSeminarDates(seminar.id, supabase);
       results.push({
         seminarId: seminar.id,
-        seminarTitle: seminar.title,
+        title: seminar.title,
         ...result
       });
-
-      if (result.success) {
-        successCount++;
-      } else {
-        errorCount++;
-      }
     }
 
-    console.log(`✅ Completed seminar date recalculation. Success: ${successCount}, Errors: ${errorCount}`);
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    console.log(`✅ Recalculation complete: ${successCount} success, ${failureCount} failures`);
 
     return NextResponse.json({
       message: 'Seminar date recalculation completed',
       summary: {
-        totalSeminars: seminars?.length || 0,
-        successCount,
-        errorCount
+        total: results.length,
+        success: successCount,
+        failures: failureCount
       },
       results
     });
 
   } catch (error) {
-    console.error('❌ Admin recalculate seminar dates error:', error);
+    console.error('❌ Admin Recalculate API error:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Date formatting utilities
-export const formatDate = (date: string | Date, formatStr = DATE_CONFIG.defaultFormat) => {
+export const formatDate = (date: string | Date, formatStr: string = DATE_CONFIG.defaultFormat) => {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(dateObj)) return '';
@@ -331,4 +331,73 @@ export const storage = {
       // Ignore errors
     }
   },
+};
+
+// Semester utilities
+export interface SemesterOption {
+  value: string;
+  label: string;
+  year: number;
+  semester: number;
+}
+
+/**
+ * Generate available semester options for seminar creation
+ * Returns current year's 1st & 2nd semester, and next year's 1st semester
+ */
+export const getAvailableSemesters = (): SemesterOption[] => {
+  const currentYear = new Date().getFullYear();
+  const nextYear = currentYear + 1;
+
+  return [
+    {
+      value: `${currentYear}-1`,
+      label: `${currentYear}년 1학기`,
+      year: currentYear,
+      semester: 1
+    },
+    {
+      value: `${currentYear}-2`, 
+      label: `${currentYear}년 2학기`,
+      year: currentYear,
+      semester: 2
+    },
+    {
+      value: `${nextYear}-1`,
+      label: `${nextYear}년 1학기`,
+      year: nextYear,
+      semester: 1
+    }
+  ];
+};
+
+/**
+ * Get the default semester based on current date
+ * Returns 1st semester if in Jan-Aug, 2nd semester if in Sep-Dec
+ */
+export const getDefaultSemester = (): string => {
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // 0-based to 1-based
+  const currentYear = currentDate.getFullYear();
+
+  // Jan-Aug: 1st semester, Sep-Dec: 2nd semester
+  if (currentMonth <= 8) {
+    return `${currentYear}-1`;
+  } else {
+    return `${currentYear}-2`;
+  }
+};
+
+/**
+ * Format semester value to display label
+ */
+export const formatSemesterLabel = (semesterValue: string): string => {
+  const [year, semester] = semesterValue.split('-');
+  if (semester === '1') {
+    return `${year}년 1학기`;
+  } else if (semester === '2') {
+    return `${year}년 2학기`;
+  }
+  // Fallback for legacy formats
+  return semesterValue;
 };
