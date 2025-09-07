@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 
-export default function AttendanceScanPage() {
+// Separate component that uses useSearchParams
+function AttendanceScanContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'expired'>('loading');
@@ -119,53 +120,85 @@ export default function AttendanceScanPage() {
   };
 
   return (
-    <MainLayout>
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4">
-          <CardHeader>
-            <div className="flex flex-col items-center text-center space-y-4">
-              {getIcon()}
-              <div>
-                <CardTitle className={`text-xl ${getColor()}`}>
-                  {getTitle()}
-                </CardTitle>
-                {seminarTitle && status === 'success' && (
-                  <CardDescription className="mt-2">
-                    {seminarTitle} 출석 완료
-                  </CardDescription>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-muted-foreground">{message}</p>
-            
-            {status === 'success' && (
-              <p className="text-xs text-muted-foreground">
-                3초 후 세미나 페이지로 자동 이동됩니다...
-              </p>
-            )}
-            
-            <div className="flex gap-2 justify-center">
-              <Button
-                variant="outline"
-                onClick={() => router.back()}
-              >
-                이전으로
-              </Button>
-              
-              {status !== 'loading' && (
-                <Button
-                  onClick={() => router.push('/dashboard')}
-                  variant={status === 'success' ? 'default' : 'outline'}
-                >
-                  대시보드로
-                </Button>
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <Card className="max-w-md w-full mx-4">
+        <CardHeader>
+          <div className="flex flex-col items-center text-center space-y-4">
+            {getIcon()}
+            <div>
+              <CardTitle className={`text-xl ${getColor()}`}>
+                {getTitle()}
+              </CardTitle>
+              {seminarTitle && status === 'success' && (
+                <CardDescription className="mt-2">
+                  {seminarTitle} 출석 완료
+                </CardDescription>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">{message}</p>
+          
+          {status === 'success' && (
+            <p className="text-xs text-muted-foreground">
+              3초 후 세미나 페이지로 자동 이동됩니다...
+            </p>
+          )}
+          
+          <div className="flex gap-2 justify-center">
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+            >
+              이전으로
+            </Button>
+            
+            {status !== 'loading' && (
+              <Button
+                onClick={() => router.push('/dashboard')}
+                variant={status === 'success' ? 'default' : 'outline'}
+              >
+                대시보드로
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Loading fallback component
+function AttendanceScanLoading() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <Card className="max-w-md w-full mx-4">
+        <CardHeader>
+          <div className="flex flex-col items-center text-center space-y-4">
+            <Loader2 className="w-16 h-16 animate-spin text-blue-600" />
+            <div>
+              <CardTitle className="text-xl text-blue-600">
+                출석 처리 중...
+              </CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="text-center">
+          <p className="text-muted-foreground">QR 코드를 확인하고 있습니다...</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function AttendanceScanPage() {
+  return (
+    <MainLayout>
+      <Suspense fallback={<AttendanceScanLoading />}>
+        <AttendanceScanContent />
+      </Suspense>
     </MainLayout>
   );
 } 
