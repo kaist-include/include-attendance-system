@@ -289,4 +289,27 @@ export type NotificationType =
   | 'session_reminder'
   | 'seminar_updated'
   | 'announcement'
-  | 'attendance_marked'; 
+  | 'attendance_marked';
+
+// Dashboard Types
+export interface DashboardStats {
+  currentSeminars: number;
+  attendanceRate: number;
+  upcomingSessions: number;
+  completedSeminars: number;
+  totalEnrollments: number;
+  recentActivity: number;
+  currentSemester: string;
+}
+
+export interface DashboardAnnouncement {
+  id: string;
+  title: string;
+  content: string;
+  time: string;
+  isNew: boolean;
+  isGlobal: boolean;
+  isPinned: boolean;
+  seminarTitle?: string;
+  authorName?: string;
+} 

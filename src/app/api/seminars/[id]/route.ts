@@ -181,6 +181,20 @@ export async function PUT(
     if (updates.applicationType !== undefined) updateData.application_type = updates.applicationType;
     if (updates.status !== undefined) updateData.status = updates.status;
 
+    // Handle semester_id updates (validate semester exists)
+    if (updates.semester_id !== undefined) {
+      const { data: semester, error: semesterError } = await supabase
+        .from('semesters')
+        .select('id, name')
+        .eq('id', updates.semester_id)
+        .single();
+
+      if (semesterError || !semester) {
+        return NextResponse.json({ error: 'Invalid semester selected' }, { status: 400 });
+      }
+      updateData.semester_id = updates.semester_id;
+    }
+
     // Update seminar
     const { data: updatedSeminar, error: updateError } = await supabase
       .from('seminars')

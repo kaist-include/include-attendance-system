@@ -9,6 +9,24 @@ import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, DATE_CONFIG, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import type { ApplicationType, Session } from '@/types';
 import { createClient } from '@/utils/supabase/client';
+import { 
+  Edit, 
+  BarChart3, 
+  Tag, 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  BookOpen, 
+  Lightbulb, 
+  X,
+  ArrowLeft,
+  Users,
+  CheckSquare,
+  UserPlus,
+  ClockIcon,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
 
 const categoryTags = ['기초', '백엔드', '프론트엔드', 'AI'];
 
@@ -409,41 +427,73 @@ export default function SeminarDetailPage() {
             </div>
           </div>
           <div className="mt-4 md:mt-0 flex gap-2">
-            <Button variant="outline" onClick={() => router.push(ROUTES.seminars)}>목록으로</Button>
+            <Button variant="outline" onClick={() => router.push(ROUTES.seminars)}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              목록으로
+            </Button>
             {canManage && (
               <>
-                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>신청 관리</Button>
-                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>출석 관리</Button>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/edit`)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  세미나 수정
+                </Button>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/enrollments`)}>
+                  <Users className="w-4 h-4 mr-2" />
+                  신청 관리
+                </Button>
+                <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  출석 관리
+                </Button>
               </>
             )}
             {/* Show attendance button for enrolled members */}
             {user && seminarData.currentUserEnrollment?.status === 'approved' && !canManage && (
               <Button variant="outline" onClick={() => router.push(`/seminars/${id}/attendance`)}>
-                📊 내 출석 현황
+                <BarChart3 className="w-4 h-4 mr-2" />
+                내 출석 현황
               </Button>
             )}
             {!user ? (
-              <Button onClick={handleEnroll}>신청하기</Button>
+              <Button onClick={handleEnroll}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                신청하기
+              </Button>
             ) : seminarData.currentUserEnrollment ? (
               // 이미 신청한 사용자 - 모든 신청은 승인 대기
               seminarData.currentUserEnrollment.status === 'pending' ? (
-                <Button variant="secondary" disabled>승인 대기중</Button>
+                <Button variant="secondary" disabled>
+                  <ClockIcon className="w-4 h-4 mr-2" />
+                  승인 대기중
+                </Button>
               ) : seminarData.currentUserEnrollment.status === 'approved' ? (
-                <Button variant="outline" disabled>수강중</Button>
+                <Button variant="outline" disabled>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  수강중
+                </Button>
               ) : (
-                <Button variant="destructive" disabled>신청 거절</Button>
+                <Button variant="destructive" disabled>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  신청 거절
+                </Button>
               )
             ) : seminarData.enrollments.approved < seminarData.capacity ? (
               // 신청하지 않았고 정원이 남은 경우 - 승인 방식 안내
               <div className="flex flex-col gap-2">
-                <Button onClick={handleEnroll}>신청하기</Button>
+                <Button onClick={handleEnroll}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  신청하기
+                </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   신청 후 세미나 개설자의 승인을 받아야 합니다
                 </p>
               </div>
             ) : (
               // 정원 마감
-              <Button variant="secondary" disabled>정원 마감</Button>
+              <Button variant="secondary" disabled>
+                <XCircle className="w-4 h-4 mr-2" />
+                정원 마감
+              </Button>
             )}
           </div>
         </div>
@@ -515,8 +565,9 @@ export default function SeminarDetailPage() {
                     </p>
                   )}
                   {isEditing && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      💡 일정은 세션 날짜에 따라 자동으로 계산됩니다
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center">
+                      <Lightbulb className="w-3 h-3 mr-1" />
+                      일정은 세션 날짜에 따라 자동으로 계산됩니다
                     </p>
                   )}
                 </div>
@@ -578,9 +629,12 @@ export default function SeminarDetailPage() {
                   <div className="flex flex-wrap gap-2">
                     {(isEditing && editData ? editData.tags : seminarData.tags).map(tag => (
                       <span key={tag} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                        <span className="mr-1">🏷️</span>{tag}
+                        <Tag className="w-3 h-3 mr-1" />
+                        {tag}
                         {canManage && isEditing && (
-                          <button className="ml-2 text-xs opacity-70 hover:opacity-100" onClick={() => handleRemoveTag(tag)}>✕</button>
+                          <button className="ml-2 text-xs opacity-70 hover:opacity-100" onClick={() => handleRemoveTag(tag)}>
+                            <X className="w-3 h-3" />
+                          </button>
                         )}
                       </span>
                     ))}
@@ -679,7 +733,8 @@ export default function SeminarDetailPage() {
               각 회차의 날짜, 주제, 학습 내용 기록
               <br />
               <span className="text-xs text-muted-foreground">
-                💡 세미나 시작/종료 날짜는 세션 날짜에 따라 자동으로 계산됩니다
+                                  <Lightbulb className="w-3 h-3 inline mr-1" />
+                  세미나 시작/종료 날짜는 세션 날짜에 따라 자동으로 계산됩니다
               </span>
             </CardDescription>
           </CardHeader>
@@ -695,9 +750,20 @@ export default function SeminarDetailPage() {
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">{s.description}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                        <span>📅 {new Date(s.date).toLocaleDateString()}</span>
-                        <span>⏱️ {s.duration_minutes}분</span>
-                        {s.location && <span>📍 {s.location}</span>}
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(s.date).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {s.duration_minutes}분
+                        </span>
+                        {s.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {s.location}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {canManage && (
@@ -718,7 +784,7 @@ export default function SeminarDetailPage() {
 
               {seminarData.sessions.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <span className="block text-6xl mb-4 opacity-30">📚</span>
+                  <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-30" />
                   <p>등록된 회차가 없습니다</p>
                 </div>
               )}

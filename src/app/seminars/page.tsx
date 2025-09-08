@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, Filter, Calendar, Users, Clock, MapPin, Tag, GraduationCap, Loader2 } from 'lucide-react';
+import { Search, Filter, Calendar, Users, Clock, MapPin, Tag, GraduationCap, Loader2, BookOpen } from 'lucide-react';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -226,7 +226,7 @@ export default function SeminarsPage() {
 
                 {/* 학기 필터 */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-muted-foreground">📚</span>
+                  <BookOpen className="w-4 h-4 text-muted-foreground" />
                   <select
                     value={semesterFilter}
                     onChange={(e) => setSemesterFilter(e.target.value)}
