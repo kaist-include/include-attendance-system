@@ -158,6 +158,18 @@ export default function SeminarDetailPage() {
     return Math.min((seminarData.enrollments.approved / seminarData.capacity) * 100, 100);
   }, [seminarData]);
 
+  // Check if owner can delete seminar with approved users
+  // Allow deletion if there's only 1 approved user (assuming it's the owner)
+  const canDeleteWithApprovedUsers = useMemo(() => {
+    if (!seminarData || !user) return false;
+    
+    // If owner is the current user and there's only 1 approved user, allow deletion
+    const isOwner = seminarData.owner.id === user.id;
+    const hasOnlyOneApprovedUser = seminarData.enrollments.approved === 1;
+    
+    return isOwner && hasOnlyOneApprovedUser;
+  }, [seminarData, user]);
+
   // Helper function to get seminar status info
   const getStatusInfo = (status: string) => {
     const statusKey = status as keyof typeof SEMINAR_STATUS.labels;
@@ -1431,10 +1443,17 @@ export default function SeminarDetailPage() {
                     <li>• 모든 신청자 및 수강생 정보</li>
                   </ul>
                 </div>
-                {seminarData?.enrollments.approved > 0 && !isAdmin && (
+                {seminarData?.enrollments.approved > 0 && !isAdmin && !canDeleteWithApprovedUsers && (
                   <Alert variant="destructive">
                     <AlertDescription className="text-xs">
-                      승인된 수강생이 있는 세미나입니다. 관리자에게 문의하세요.
+                      다른 승인된 수강생이 있는 세미나입니다. 관리자에게 문의하세요.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {seminarData?.enrollments.approved > 0 && canDeleteWithApprovedUsers && !isAdmin && (
+                  <Alert>
+                    <AlertDescription className="text-xs">
+                      ✅ 승인된 수강생이 본인뿐이므로 삭제가 가능합니다.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1452,7 +1471,7 @@ export default function SeminarDetailPage() {
                 <Button
                   variant="destructive"
                   onClick={handleDeleteSeminar}
-                  disabled={deleting || (seminarData?.enrollments.approved > 0 && !isAdmin)}
+                  disabled={deleting || (seminarData?.enrollments.approved > 0 && !isAdmin && !canDeleteWithApprovedUsers)}
                   className="flex-1"
                 >
                   {deleting ? '삭제 중...' : '삭제 확인'}
