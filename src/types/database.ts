@@ -136,7 +136,6 @@ export type Database = {
         Row: {
           id: string;
           seminar_id: string;
-          session_number: number;
           title: string;
           description: string | null;
           date: string;
@@ -150,7 +149,6 @@ export type Database = {
         Insert: {
           id?: string;
           seminar_id: string;
-          session_number: number;
           title: string;
           description?: string | null;
           date: string;
@@ -162,7 +160,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
-          session_number?: number;
+  
           title?: string;
           description?: string | null;
           date?: string;

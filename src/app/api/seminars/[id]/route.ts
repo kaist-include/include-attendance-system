@@ -45,7 +45,7 @@ export async function GET(
           date,
           duration_minutes,
           location,
-          session_number,
+  
           status,
           materials_url
         )
@@ -299,7 +299,8 @@ export async function DELETE(
     // 1. First get all session IDs for this seminar
     const { data: sessions, error: sessionsQueryError } = await supabase
       .from('sessions')
-      .select('id, title, session_number')
+              .select('id, title, date')
+        .order('date', { ascending: true })
       .eq('seminar_id', id);
 
     if (sessionsQueryError) {

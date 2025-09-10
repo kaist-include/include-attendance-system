@@ -65,7 +65,6 @@ export type SeminarStatus = 'draft' | 'recruiting' | 'in_progress' | 'completed'
 export interface Session {
   id: string;
   seminar_id: string;
-  session_number: number;
   title: string;
   description?: string;
   date: string;

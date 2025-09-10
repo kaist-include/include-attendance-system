@@ -62,7 +62,6 @@ export async function GET(
       .from('sessions')
       .select(`
         id,
-        session_number,
         title,
         date,
         duration_minutes,
@@ -70,7 +69,7 @@ export async function GET(
         status
       `)
       .eq('seminar_id', seminarId)
-      .order('session_number', { ascending: true });
+      .order('date', { ascending: true });
 
     if (sessionsError) {
       console.error('❌ Error fetching sessions:', sessionsError);
@@ -172,9 +171,9 @@ export async function GET(
         id: seminarId,
         title: seminar.title
       },
-      sessions: sessions?.map(session => ({
+      sessions: sessions?.map((session, index) => ({
         ...session,
-        sessionNumber: session.session_number
+        sessionNumber: index + 1
       })) || [],
       users: users,
       attendances: attendanceMap

@@ -43,6 +43,14 @@ import {
   import { DateTimePicker } from '@/components/ui/date-time-picker';
   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
   import { Spinner } from '@/components/ui/spinner';
+  import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from "@/components/ui/dialog";
 
 const categoryTags = ['기초', '백엔드', '프론트엔드', 'AI'];
 
@@ -125,6 +133,18 @@ export default function SeminarDetailPage() {
   const [addingSession, setAddingSession] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Edit session states
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editSessionData, setEditSessionData] = useState<{
+    title: string;
+    description: string;
+    date: string;
+    duration_minutes: number;
+    location: string;
+  }>({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+  const [updatingSession, setUpdatingSession] = useState(false);
 
   // Status management states
   const [changingStatus, setChangingStatus] = useState(false);
@@ -308,6 +328,64 @@ export default function SeminarDetailPage() {
     }
   };
 
+  // Edit session functions
+  const handleEditSession = (session: Session) => {
+    setEditingSession(session);
+    // Use the stored date as-is for editing
+    setEditSessionData({
+      title: session.title,
+      description: session.description || '',
+      date: session.date, // Use stored date directly
+      duration_minutes: session.duration_minutes,
+      location: session.location || '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateSession = async () => {
+    if (!editingSession || !seminarData) return;
+
+    try {
+      setUpdatingSession(true);
+      setError('');
+
+      const response = await fetch(`/api/seminars/${seminarData.id}/sessions/${editingSession.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editSessionData.title,
+          description: editSessionData.description,
+          date: editSessionData.date,
+          duration_minutes: editSessionData.duration_minutes,
+          location: editSessionData.location,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Refresh seminar data by triggering a re-fetch
+      const refreshResponse = await fetch(`/api/seminars/${seminarData.id}`);
+      if (refreshResponse.ok) {
+        const refreshedData = await refreshResponse.json();
+        setSeminarData(refreshedData);
+      }
+      
+      // Reset form and close modal - no success message needed
+      setEditingSession(null);
+      setEditSessionData({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+      setEditDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update session');
+      console.error('Error updating session:', err);
+    } finally {
+      setUpdatingSession(false);
+    }
+  };
+
   // Add session
   const handleAddSession = async () => {
     if (!newSession.title || !newSession.date) return;
@@ -341,7 +419,7 @@ export default function SeminarDetailPage() {
       // Update local state
       setSeminarData(prev => prev ? {
         ...prev,
-        sessions: [...prev.sessions, newSessionData].sort((a, b) => a.session_number - b.session_number)
+                        sessions: [...prev.sessions, newSessionData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       } : null);
 
       // Reset form
@@ -1025,19 +1103,33 @@ export default function SeminarDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {seminarData.sessions.map((s) => (
+              {seminarData.sessions
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map((s, index) => (
                 <div key={s.id} className="border border-border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">{s.session_number}회차</span>
+                        <span className="text-sm text-muted-foreground">{index + 1}회차</span>
                         <h3 className="font-medium text-foreground">{s.title}</h3>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">{s.description}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {new Date(s.date).toLocaleDateString()}
+                          {new Date(s.date).toLocaleDateString('ko-KR', { 
+                            year: 'numeric',
+                            month: 'long', 
+                            day: 'numeric'
+                          })}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <ClockIcon className="w-3 h-3" />
+                          {new Date(s.date).toLocaleTimeString('ko-KR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
@@ -1053,12 +1145,139 @@ export default function SeminarDetailPage() {
                     </div>
                     {canManage && (
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">수정</Button>
+                        <Dialog open={editDialogOpen && editingSession?.id === s.id} onOpenChange={setEditDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleEditSession(s)}
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              수정
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>{index + 1}회차 수정</DialogTitle>
+                              <DialogDescription>
+                                세션 정보를 수정하세요. 모든 변경사항은 즉시 반영됩니다.
+                              </DialogDescription>
+                            </DialogHeader>
+                            
+                            <div className="space-y-4 py-4">
+                              {/* 첫 번째 행: 주제와 날짜 */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit-session-title">주제 *</Label>
+                                  <Input
+                                    id="edit-session-title"
+                                    placeholder="회차 주제를 입력하세요"
+                                    value={editSessionData.title}
+                                    onChange={e => setEditSessionData(v => ({ ...v, title: e.target.value }))}
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label>날짜 및 시간 *</Label>
+                                  <DateTimePicker
+                                    date={editSessionData.date ? new Date(editSessionData.date) : undefined}
+                                    onSelect={(date) => {
+                                      if (date) {
+                                        // Store the selected date as-is (Korean local time)
+                                        setEditSessionData(v => ({ ...v, date: date.toISOString() }));
+                                      } else {
+                                        setEditSessionData(v => ({ ...v, date: '' }));
+                                      }
+                                    }}
+                                    placeholder="날짜와 시간을 선택하세요"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 두 번째 행: 지속시간과 장소 */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>지속 시간 *</Label>
+                                  <Select
+                                    value={editSessionData.duration_minutes.toString()}
+                                    onValueChange={(value) => setEditSessionData(v => ({ ...v, duration_minutes: Number(value) }))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="지속 시간 선택" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {Array.from({ length: 16 }, (_, i) => {
+                                        const minutes = (i + 1) * 30;
+                                        const hours = Math.floor(minutes / 60);
+                                        const remainingMinutes = minutes % 60;
+                                        const label = hours > 0 
+                                          ? `${hours}시간${remainingMinutes > 0 ? ` ${remainingMinutes}분` : ''}`
+                                          : `${minutes}분`;
+                                        return (
+                                          <SelectItem key={minutes} value={minutes.toString()}>
+                                            {label}
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label>장소</Label>
+                                  <Input
+                                    placeholder="장소를 입력하세요 (선택)"
+                                    value={editSessionData.location}
+                                    onChange={e => setEditSessionData(v => ({ ...v, location: e.target.value }))}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 세 번째 행: 설명 */}
+                              <div className="space-y-2">
+                                <Label>학습 내용</Label>
+                                <Textarea
+                                  placeholder="이번 회차에서 다룰 내용을 설명해주세요 (선택)"
+                                  value={editSessionData.description}
+                                  onChange={e => setEditSessionData(v => ({ ...v, description: e.target.value }))}
+                                  rows={3}
+                                />
+                              </div>
+
+                              {/* 버튼 영역 */}
+                              <div className="flex justify-end space-x-2 pt-4 border-t">
+                                <Button 
+                                  variant="outline" 
+                                  disabled={updatingSession}
+                                  onClick={() => setEditDialogOpen(false)}
+                                >
+                                  취소
+                                </Button>
+                                <Button 
+                                  onClick={handleUpdateSession}
+                                  disabled={updatingSession || !editSessionData.title || !editSessionData.date}
+                                  className="min-w-24"
+                                >
+                                  {updatingSession ? (
+                                    <>
+                                      <Spinner className="w-4 h-4 mr-2" />
+                                      수정 중...
+                                    </>
+                                  ) : (
+                                    '수정 완료'
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        
                         <Button 
                           variant="secondary" 
                           size="sm"
                           onClick={() => handleDeleteSession(s.id)}
                         >
+                          <Trash2 className="w-3 h-3 mr-1" />
                           삭제
                         </Button>
                       </div>
@@ -1098,9 +1317,8 @@ export default function SeminarDetailPage() {
                             date={newSession.date ? new Date(newSession.date) : undefined}
                             onSelect={(date) => {
                               if (date) {
-                                // Convert to local datetime string format
-                                const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-                                setNewSession(v => ({ ...v, date: localDate.toISOString().slice(0, 16) }));
+                                // Store the selected date as-is (Korean local time)
+                                setNewSession(v => ({ ...v, date: date.toISOString() }));
                               } else {
                                 setNewSession(v => ({ ...v, date: '' }));
                               }
