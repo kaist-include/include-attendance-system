@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, Filter, Calendar, Users, Clock, MapPin, Tag, GraduationCap, Loader2, BookOpen } from 'lucide-react';
+import { Search, Filter, Calendar, Users, Clock, MapPin, Tag, GraduationCap, Loader2, BookOpen, Check, X } from 'lucide-react';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LoadingSpinner } from '@/components/ui/spinner';
 import { ROUTES } from '@/config/constants';
 import { createClient } from '@/utils/supabase/client';
 import { formatSemesterLabel } from '@/lib/utils';
@@ -27,7 +31,7 @@ interface Seminar {
   semester: string;
   applicationStart: string;
   applicationEnd: string;
-  applicationType: 'first_come' | 'selection';
+
   currentUserEnrollment: {
     status: 'pending' | 'approved' | 'rejected' | 'cancelled';
     applied_at: string;
@@ -196,13 +200,13 @@ export default function SeminarsPage() {
             <div className="space-y-4">
               {/* 검색바 */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 opacity-80" />
-                <input
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 opacity-80 z-10" />
+                <Input
                   type="text"
                   placeholder="세미나 제목, 설명, 강사명으로 검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
+                  className="pl-10"
                 />
               </div>
 
@@ -210,50 +214,71 @@ export default function SeminarsPage() {
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 {/* 상태 필터 */}
                 <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
-                  >
-                    <option key="all-status" value="all">모든 상태</option>
-                    <option key="draft" value="draft">준비중</option>
-                    <option key="in_progress" value="in_progress">진행중</option>
-                    <option key="completed" value="completed">완료</option>
-                    <option key="cancelled" value="cancelled">취소</option>
-                  </select>
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="모든 상태" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem key="all-status" value="all">모든 상태</SelectItem>
+                      <SelectItem key="draft" value="draft">준비중</SelectItem>
+                      <SelectItem key="in_progress" value="in_progress">진행중</SelectItem>
+                      <SelectItem key="completed" value="completed">완료</SelectItem>
+                      <SelectItem key="cancelled" value="cancelled">취소</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* 학기 필터 */}
                 <div className="flex items-center space-x-2">
                   <BookOpen className="w-4 h-4 text-muted-foreground" />
-                  <select
-                    value={semesterFilter}
-                    onChange={(e) => setSemesterFilter(e.target.value)}
-                    className="px-3 py-2 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none"
-                  >
-                    <option key="all-semester" value="all">모든 학기</option>
-                    {allSemesters.map(sem => (
-                      <option key={sem} value={sem}>{sem}</option>
-                    ))}
-                  </select>
+                  <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="모든 학기" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem key="all-semester" value="all">모든 학기</SelectItem>
+                      {allSemesters.map(sem => (
+                        <SelectItem key={sem} value={sem}>{sem}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* 태그 필터 */}
-                <div className="flex flex-wrap gap-2">
-                  {allTags.map(tag => (
-                    <button
-                      key={tag}
-                      onClick={() => toggleTag(tag)}
-                      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                        selectedTags.includes(tag)
-                          ? 'bg-secondary text-foreground border border-border'
-                          : 'bg-muted text-muted-foreground border border-border hover:bg-accent'
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
+                          selectedTags.includes(tag)
+                            ? 'bg-primary text-primary-foreground border border-primary shadow-sm scale-105'
+                            : 'bg-muted text-muted-foreground border border-border hover:bg-accent hover:text-accent-foreground hover:border-accent hover:scale-102'
+                        }`}
+                      >
+                        {selectedTags.includes(tag) && <Check className="w-3 h-3" />}
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Clear Tags Button */}
+                  {selectedTags.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-muted-foreground">
+                        {selectedTags.length}개 태그 선택됨
+                      </div>
+                      <button
+                        onClick={() => setSelectedTags([])}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                        태그 지우기
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -346,13 +371,14 @@ export default function SeminarsPage() {
                 {/* 태그 */}
                 <div className="flex flex-wrap gap-1">
                   {seminar.tags.map(tag => (
-                    <span
+                    <Badge
                       key={tag}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-foreground/90 ring-1 ring-inset ring-border"
+                      variant="secondary"
+                      className="gap-1"
                     >
-                      <Tag className="w-3 h-3 mr-1" />
+                      <Tag className="w-3 h-3" />
                       {tag}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
 

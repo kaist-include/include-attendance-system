@@ -97,7 +97,6 @@ export type Database = {
           status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
           application_start: string;
           application_end: string;
-          application_type: 'first_come' | 'selection';
           created_at: string;
           updated_at: string;
         };
@@ -115,7 +114,6 @@ export type Database = {
           status?: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
           application_start: string;
           application_end: string;
-          application_type?: 'first_come' | 'selection';
           created_at?: string;
           updated_at?: string;
         };
@@ -131,7 +129,6 @@ export type Database = {
           status?: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
           application_start?: string;
           application_end?: string;
-          application_type?: 'first_come' | 'selection';
           updated_at?: string;
         };
       };
@@ -327,7 +324,6 @@ export type Database = {
     Enums: {
       user_role: 'admin' | 'member';
       seminar_status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
-      application_type: 'first_come' | 'selection';
       session_status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
       enrollment_status: 'pending' | 'approved' | 'rejected' | 'cancelled';
       attendance_status: 'present' | 'absent' | 'late' | 'excused';

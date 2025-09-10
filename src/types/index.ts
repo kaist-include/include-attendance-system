@@ -47,7 +47,6 @@ export interface Seminar {
   status: SeminarStatus;
   application_start: string;
   application_end: string;
-  application_type: ApplicationType;
   created_at: string;
   updated_at: string;
   
@@ -60,7 +59,7 @@ export interface Seminar {
 }
 
 export type SeminarStatus = 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
-export type ApplicationType = 'first_come' | 'selection';
+
 
 // Session Types
 export interface Session {
@@ -188,7 +187,6 @@ export interface CreateSeminarForm {
   tags: string[];
   application_start: string;
   application_end: string;
-  application_type: ApplicationType;
 }
 
 export interface CreateSessionForm {

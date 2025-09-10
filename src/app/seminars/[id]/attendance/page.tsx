@@ -5,6 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoadingSpinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -488,8 +493,7 @@ export default function SeminarAttendancePage() {
       <MainLayout>
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">출석 정보를 불러오는 중...</p>
+                    <LoadingSpinner />
           </div>
         </div>
       </MainLayout>
@@ -560,6 +564,10 @@ export default function SeminarAttendancePage() {
                 <div>
                   <div className="text-sm text-muted-foreground">출석률</div>
                   <div className="text-2xl font-bold text-foreground">{memberData?.statistics?.attendanceRate || 0}%</div>
+                  <Progress 
+                    value={memberData?.statistics?.attendanceRate || 0} 
+                    className="mt-2 h-2 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -735,30 +743,32 @@ export default function SeminarAttendancePage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="text-sm font-medium text-foreground">회차 선택</label>
-                <select
-                  value={selectedSessionId}
-                  onChange={e => setSelectedSessionId(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                >
+                <Label>회차 선택</Label>
+                <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="세션을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {attendanceData?.sessions?.map(s => (
-                      <option key={s.id} value={s.id}>
+                      <SelectItem key={s.id} value={s.id}>
                         {s.sessionNumber}회차 · {s.title} · {new Date(s.date).toLocaleDateString()}
-                      </option>
+                      </SelectItem>
                     )) || (
-                      <option key="loading" value="">세션 로딩 중...</option>
+                      <SelectItem key="loading" value="" disabled>세션 로딩 중...</SelectItem>
                     )}
-                </select>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="md:col-span-2 flex flex-col items-center justify-center">
                   {error && error.includes('QR') ? (
                     <>
-                      <div className="w-64 h-64 flex flex-col items-center justify-center border-2 border-dashed border-red-300 rounded bg-red-50 dark:bg-red-900/20">
-                        <span className="text-red-600 dark:text-red-400 text-center text-sm px-4">
-                          {error}
-                        </span>
+                      <div className="w-64 h-64 flex flex-col items-center justify-center space-y-4">
+                        <Alert variant="destructive" className="w-full">
+                          <AlertDescription className="text-center text-sm">
+                            {error}
+                          </AlertDescription>
+                        </Alert>
                         <Button 
-                          className="mt-4" 
                           variant="outline" 
                           size="sm"
                           onClick={generateQr}
@@ -801,12 +811,13 @@ export default function SeminarAttendancePage() {
                                 {numericCode}
                               </p>
                             ) : (
-                              <div 
-                                className="text-3xl font-mono font-bold text-muted-foreground tracking-wider cursor-pointer select-none"
+                              <Button
+                                variant="ghost"
                                 onClick={() => setShowNumericCode(true)}
+                                className="text-3xl font-mono font-bold text-muted-foreground tracking-wider h-auto p-2"
                               >
                                 ••••••
-                              </div>
+                              </Button>
                             )}
                             <p className="text-xs text-muted-foreground mt-2 opacity-70">
                               <Lightbulb className="w-3 h-3 inline mr-1" />
@@ -826,8 +837,8 @@ export default function SeminarAttendancePage() {
                     </>
                   ) : (
                     <>
-                      <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted-foreground rounded">
-                        <span className="text-muted-foreground">
+                      <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted rounded-lg bg-muted/30">
+                        <span className="text-muted-foreground text-center text-sm">
                           {generatingQr ? 'QR 코드 생성 중...' : 'QR 코드를 생성하세요'}
                         </span>
                       </div>

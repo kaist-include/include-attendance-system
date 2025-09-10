@@ -5,6 +5,9 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { ROUTES } from '@/config/constants';
 import { Loader2, Calendar, Plus, Check, X, CheckCircle, XCircle } from 'lucide-react';
@@ -206,35 +209,32 @@ export default function AdminPage() {
                 {/* Create Form */}
                 {showForm && (
                   <form onSubmit={handleCreateSemester} className="space-y-3 p-4 border rounded-lg">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">학기명</label>
-                      <input
+                    <div className="space-y-2">
+                      <Label>학기명</Label>
+                      <Input
                         type="text"
                         placeholder="예: 2025-1"
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full px-3 py-2 border rounded-md text-sm"
                         required
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">시작일</label>
-                        <input
+                      <div className="space-y-2">
+                        <Label>시작일</Label>
+                        <Input
                           type="date"
                           value={formData.start_date}
                           onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md text-sm"
                           required
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">종료일</label>
-                        <input
+                      <div className="space-y-2">
+                        <Label>종료일</Label>
+                        <Input
                           type="date"
                           value={formData.end_date}
                           onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md text-sm"
                           required
                         />
                       </div>
@@ -247,7 +247,7 @@ export default function AdminPage() {
                         onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
                         className="rounded"
                       />
-                      <label htmlFor="is_active" className="text-sm">현재 학기로 설정</label>
+                      <Label htmlFor="is_active" className="text-sm">현재 학기로 설정</Label>
                     </div>
                     <Button type="submit" disabled={creating} className="w-full">
                       {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -289,9 +289,9 @@ export default function AdminPage() {
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">{semester.name}</span>
                             {semester.is_active && (
-                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                              <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
                                 현재 학기
-                              </span>
+                              </Badge>
                             )}
                           </div>
                           <div className="text-sm text-muted-foreground">

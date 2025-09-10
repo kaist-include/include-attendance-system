@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import { Tag, X, FileText } from 'lucide-react';
@@ -27,12 +33,12 @@ export default function CreateSeminarPage() {
     description: '',
     capacity: DEFAULTS.seminarCapacity as number,
     semester_id: '',
-    start_date: '',
-    end_date: '',
-    application_start: '',
-    application_end: '',
+    start_date: undefined as Date | undefined,
+    end_date: undefined as Date | undefined,
+    application_start: undefined as Date | undefined,
+    application_end: undefined as Date | undefined,
     location: '',
-    application_type: 'selection' as 'first_come' | 'selection',
+
     tags: [] as string[],
     tagInput: '',
   });
@@ -93,14 +99,14 @@ export default function CreateSeminarPage() {
           description: form.description,
           capacity: form.capacity,
           semester_id: form.semester_id,
-          start_date: form.start_date,
-          end_date: form.end_date || null,
+          start_date: form.start_date.toISOString().split('T')[0],
+          end_date: form.end_date ? form.end_date.toISOString().split('T')[0] : null,
           location: form.location || null,
-          application_type: form.application_type,
-          application_start: new Date(form.application_start + 'T00:00:00.000Z').toISOString(),
+    
+          application_start: form.application_start.toISOString(),
           application_end: form.application_end ? 
-            new Date(form.application_end + 'T23:59:59.999Z').toISOString() :
-            new Date(form.application_start + 'T23:59:59.999Z').toISOString(),
+            form.application_end.toISOString() :
+            form.application_start.toISOString(),
           tags: form.tags,
         }),
       });
@@ -137,36 +143,37 @@ export default function CreateSeminarPage() {
           <CardContent>
             <form className="space-y-6" onSubmit={onSubmit}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground">제목</label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="title">제목</Label>
+                  <Input
+                    id="title"
                     value={form.title}
                     onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                     maxLength={VALIDATION_RULES.seminar.titleMaxLength}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="세미나 제목"
                     required
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground">정원</label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="capacity">정원</Label>
+                  <Input
+                    id="capacity"
                     type="number"
                     min={VALIDATION_RULES.seminar.minCapacity}
                     max={VALIDATION_RULES.seminar.maxCapacity}
                     value={form.capacity}
                     onChange={e => setForm(f => ({ ...f, capacity: Number(e.target.value) }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     required
                   />
                 </div>
-                <div className="lg:col-span-2">
-                  <label className="text-sm font-medium text-foreground">설명</label>
-                  <textarea
+                <div className="lg:col-span-2 space-y-2">
+                  <Label htmlFor="description">설명</Label>
+                  <Textarea
+                    id="description"
                     value={form.description}
                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     maxLength={VALIDATION_RULES.seminar.descriptionMaxLength}
-                    className="mt-1 w-full min-h-32 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="min-h-32 resize-none"
                     placeholder="세미나에 대한 설명을 입력하세요"
                     required
                   />
@@ -174,86 +181,83 @@ export default function CreateSeminarPage() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground">학기</label>
-                  <select
+                <div className="space-y-2">
+                  <Label htmlFor="semester">학기</Label>
+                  <Select
                     value={form.semester_id}
-                    onChange={e => setForm(f => ({ ...f, semester_id: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    required
+                    onValueChange={(value) => setForm(f => ({ ...f, semester_id: value }))}
                     disabled={loadingSemesters}
+                    required
                   >
-                    <option value="">
-                      {loadingSemesters ? '학기 목록을 불러오는 중...' : '학기를 선택하세요'}
-                    </option>
-                    {semesters.map((semester) => (
-                      <option key={semester.id} value={semester.id}>
-                        {semester.label} {semester.isActive && '(현재 학기)'}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue 
+                        placeholder={loadingSemesters ? '학기 목록을 불러오는 중...' : '학기를 선택하세요'}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {semesters.map((semester) => (
+                        <SelectItem key={semester.id} value={semester.id}>
+                          {semester.label} {semester.isActive && '(현재 학기)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {semesters.length === 0 && !loadingSemesters && (
                     <p className="text-xs text-red-600 mt-1">
                       관리자가 학기를 생성해야 세미나를 개설할 수 있습니다.
                     </p>
                   )}
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground">시작일</label>
-                  <input
-                    type="date"
-                    value={form.start_date}
-                    onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    required
+                <div className="space-y-2">
+                  <Label htmlFor="start_date">시작일</Label>
+                  <DatePicker
+                    date={form.start_date}
+                    onSelect={(date) => setForm(f => ({ ...f, start_date: date }))}
+                    placeholder="세미나 시작일을 선택하세요"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground">종료일 (선택)</label>
-                  <input
-                    type="date"
-                    value={form.end_date}
-                    onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                <div className="space-y-2">
+                  <Label htmlFor="end_date">종료일 (선택)</Label>
+                  <DatePicker
+                    date={form.end_date}
+                    onSelect={(date) => setForm(f => ({ ...f, end_date: date }))}
+                    placeholder="세미나 종료일을 선택하세요"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground">신청 시작일</label>
-                  <input
-                    type="date"
-                    value={form.application_start}
-                    onChange={e => setForm(f => ({ ...f, application_start: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    required
+                <div className="space-y-2">
+                  <Label htmlFor="application_start">신청 시작일</Label>
+                  <DatePicker
+                    date={form.application_start}
+                    onSelect={(date) => setForm(f => ({ ...f, application_start: date }))}
+                    placeholder="신청 시작일을 선택하세요"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground">신청 종료일</label>
-                  <input
-                    type="date"
-                    value={form.application_end}
-                    onChange={e => setForm(f => ({ ...f, application_end: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                <div className="space-y-2">
+                  <Label htmlFor="application_end">신청 종료일</Label>
+                  <DatePicker
+                    date={form.application_end}
+                    onSelect={(date) => setForm(f => ({ ...f, application_end: date }))}
+                    placeholder="신청 종료일을 선택하세요"
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground">장소</label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="location">장소</Label>
+                  <Input
+                    id="location"
                     value={form.location}
                     onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="온라인, 오프라인 등"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground">신청 방식</label>
-                  <div className="mt-2 p-3 bg-muted rounded-lg">
+                <div className="space-y-2">
+                  <Label>신청 방식</Label>
+                  <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">
                       <FileText className="w-4 h-4 inline mr-1" /> 모든 세미나는 <strong>Owner 승인 방식</strong>입니다<br/>
                       신청자는 신청 후 세미나 개설자의 승인을 받아야 합니다
@@ -261,31 +265,46 @@ export default function CreateSeminarPage() {
                   </div>
                 </div>
 
-                <div className="lg:col-span-2">
-                  <label className="text-sm font-medium text-foreground">카테고리 태그</label>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                <div className="lg:col-span-2 space-y-2">
+                  <Label htmlFor="tags">카테고리 태그</Label>
+                  <div className="flex flex-wrap gap-2">
                     {form.tags.map(tag => (
-                      <span key={tag} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                                                  <Tag className="w-3 h-3 mr-1" />
-                          {tag}
-                                                  <button type="button" className="ml-2 text-xs opacity-70 hover:opacity-100" onClick={() => removeTag(tag)}>
-                            <X className="w-3 h-3" />
-                          </button>
-                      </span>
+                      <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+                        <Tag className="w-3 h-3" />
+                        {tag}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="ml-1 h-4 w-4 text-muted-foreground hover:text-foreground"
+                          onClick={() => removeTag(tag)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </Badge>
                     ))}
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <input
+                  <div className="flex gap-2">
+                    <Input
+                      id="tags"
                       value={form.tagInput}
                       onChange={e => setForm(f => ({ ...f, tagInput: e.target.value }))}
                       placeholder="#태그 추가"
-                      className="flex-1 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="flex-1"
                     />
                     <Button type="button" variant="outline" onClick={addTag}>추가</Button>
                   </div>
                   <div className="mt-2 flex gap-2 flex-wrap">
                     {['기초', '백엔드', '프론트엔드', 'AI'].map(ct => (
-                      <button key={ct} type="button" onClick={() => setForm(f => ({ ...f, tagInput: ct }))} className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs">#{ct}</button>
+                      <Button 
+                        key={ct} 
+                        type="button" 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={() => setForm(f => ({ ...f, tagInput: ct }))}
+                      >
+                        #{ct}
+                      </Button>
                     ))}
                   </div>
                 </div>

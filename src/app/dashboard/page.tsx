@@ -5,6 +5,9 @@ import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { LoadingSpinner } from '@/components/ui/spinner';
+import { Progress } from '@/components/ui/progress';
 import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { DashboardStats, DashboardAnnouncement } from '@/types';
@@ -181,7 +184,7 @@ export default function DashboardPage() {
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -259,6 +262,13 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                  {/* Add Progress bar for attendance rate */}
+                  {index === 1 && !statsLoading && (
+                    <Progress 
+                      value={stats?.attendanceRate || 0} 
+                      className="mt-3 h-2 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
+                    />
+                  )}
                 </CardContent>
               </Card>
             );
@@ -349,19 +359,19 @@ export default function DashboardPage() {
                           <div className="flex items-center space-x-2 flex-wrap">
                             <h3 className="font-medium text-foreground">{announcement.title}</h3>
                             {announcement.isPinned && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-200">
                                 고정
-                              </span>
+                              </Badge>
                             )}
                             {announcement.isNew && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-foreground">
+                              <Badge variant="secondary">
                                 NEW
-                              </span>
+                              </Badge>
                             )}
                             {announcement.isGlobal && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200">
                                 전체 공지
-                              </span>
+                              </Badge>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>

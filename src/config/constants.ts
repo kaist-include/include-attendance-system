@@ -82,7 +82,6 @@ export const DEFAULTS = {
   sessionStatus: 'scheduled' as const,
   enrollmentStatus: 'pending' as const,
   attendanceStatus: 'absent' as const,
-  applicationType: 'selection' as const,
   sessionDuration: 120, // 2 hours
   seminarCapacity: 20,
 } as const;
@@ -162,6 +161,55 @@ export const SEMESTER_OPTIONS: { code: string; label: string }[] = [
   { code: '2025-summer', label: '2025년 여름학기' },
   { code: '2025-fall', label: '2025년 가을학기' },
 ];
+
+// Seminar Status Labels and Styles
+export const SEMINAR_STATUS = {
+  labels: {
+    draft: '준비중',
+    recruiting: '모집중',
+    in_progress: '진행중',
+    completed: '완료',
+    cancelled: '취소됨',
+  },
+  colors: {
+    draft: {
+      bg: 'bg-gray-100',
+      text: 'text-gray-700',
+      border: 'border-gray-300',
+      darkBg: 'dark:bg-gray-800',
+      darkText: 'dark:text-gray-300',
+    },
+    recruiting: {
+      bg: 'bg-green-100',
+      text: 'text-green-700',
+      border: 'border-green-300',
+      darkBg: 'dark:bg-green-900/30',
+      darkText: 'dark:text-green-400',
+    },
+    in_progress: {
+      bg: 'bg-blue-100',
+      text: 'text-blue-700',
+      border: 'border-blue-300',
+      darkBg: 'dark:bg-blue-900/30',
+      darkText: 'dark:text-blue-400',
+    },
+    completed: {
+      bg: 'bg-purple-100',
+      text: 'text-purple-700',
+      border: 'border-purple-300',
+      darkBg: 'dark:bg-purple-900/30',
+      darkText: 'dark:text-purple-400',
+    },
+    cancelled: {
+      bg: 'bg-red-100',
+      text: 'text-red-700',
+      border: 'border-red-300',
+      darkBg: 'dark:bg-red-900/30',
+      darkText: 'dark:text-red-400',
+    },
+  },
+  order: ['draft', 'recruiting', 'in_progress', 'completed', 'cancelled'] as const,
+} as const;
 
 // API Endpoints
 export const API_ENDPOINTS = {

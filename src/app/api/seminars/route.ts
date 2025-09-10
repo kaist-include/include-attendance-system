@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         semester: seminar.semesters?.name || 'Unknown',
         applicationStart: seminar.application_start,
         applicationEnd: seminar.application_end,
-        applicationType: seminar.application_type,
+
         currentUserEnrollment: currentUserEnrollment ? {
           status: currentUserEnrollment.status,
           applied_at: currentUserEnrollment.applied_at
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         owner_id: user.id,
         semester_id: semesterId,
         status: 'draft',
-        application_type: data.application_type || data.applicationType,
+  
         application_start: data.application_start || data.applicationStart,
         application_end: data.application_end || data.applicationEnd,
         tags: data.tags || [],
