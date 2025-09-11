@@ -60,10 +60,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform the data
-    const transformedSessions = sessions?.map(session => ({
+    const transformedSessions = sessions?.map((session, index) => ({
       id: session.id,
       title: session.seminars?.title || 'Unknown',
-      session: `${session.session_number}회차`,
+      session: `세션`, // Simplified for now, will be calculated per seminar if needed
       sessionTitle: session.title,
       date: new Date(session.date).toLocaleDateString('ko-KR', {
         year: 'numeric',

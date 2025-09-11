@@ -101,23 +101,11 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Get the next session number
-    const { data: lastSession } = await supabase
-      .from('sessions')
-      .select('session_number')
-      .eq('seminar_id', seminarId)
-      .order('session_number', { ascending: false })
-      .limit(1)
-      .single();
-
-    const nextSessionNumber = (lastSession?.session_number || 0) + 1;
-
     // Create session
     const { data: newSession, error: sessionError } = await supabase
       .from('sessions')
       .insert({
         seminar_id: seminarId,
-        session_number: nextSessionNumber,
         title,
         description: description || null,
         date,

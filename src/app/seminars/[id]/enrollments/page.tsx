@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoadingSpinner } from '@/components/ui/spinner';
 import { useRequireAuth } from '@/hooks/useAuth';
 import { createClient } from '@/utils/supabase/client';
 
@@ -163,8 +166,7 @@ export default function SeminarEnrollmentsPage() {
         <div className="space-y-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">신청자 정보를 불러오는 중...</p>
+                      <LoadingSpinner />
             </div>
           </div>
         </div>
@@ -178,7 +180,9 @@ export default function SeminarEnrollmentsPage() {
         <div className="space-y-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <p className="text-red-600 mb-4">{error}</p>
+              <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
               <Button onClick={() => router.back()}>뒤로 가기</Button>
             </div>
           </div>
@@ -281,9 +285,9 @@ export default function SeminarEnrollmentsPage() {
                       
                       {/* Show owner badge instead of action buttons for self-enrollment */}
                       {a.userId === user?.id ? (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                           개설자
-                        </span>
+                        </Badge>
                       ) : (
                         <>
                           <Button 

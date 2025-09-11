@@ -62,7 +62,6 @@ CREATE TABLE seminars (
     status seminar_status DEFAULT 'draft',
     application_start TIMESTAMP WITH TIME ZONE NOT NULL,
     application_end TIMESTAMP WITH TIME ZONE NOT NULL,
-    application_type application_type DEFAULT 'first_come',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

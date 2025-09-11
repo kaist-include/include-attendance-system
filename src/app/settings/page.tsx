@@ -3,8 +3,10 @@
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAuth, useRequireAuth } from '@/hooks/useAuth';
-import ThemeToggle from '@/components/ui/theme-toggle';
+import { ModeToggle } from '@/components/ui/theme-toggle';
 import { useState } from 'react';
 
 export default function SettingsPage() {
@@ -39,20 +41,19 @@ export default function SettingsPage() {
             <CardDescription>프로필 정보</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-foreground">이메일</label>
-              <input
+            <div className="space-y-2">
+              <Label>이메일</Label>
+              <Input
                 value={user?.email || ''}
                 readOnly
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-muted text-foreground/80"
+                className="bg-muted text-foreground/80"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">닉네임</label>
-              <input
+            <div className="space-y-2">
+              <Label>닉네임</Label>
+              <Input
                 value={nickname}
                 onChange={e => setNickname(e.target.value)}
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="표시 이름"
               />
             </div>
@@ -66,9 +67,9 @@ export default function SettingsPage() {
             <CardDescription>테마 설정 및 접근성</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-foreground">테마</label>
-              <div className="mt-2"><ThemeToggle /></div>
+            <div className="space-y-2">
+              <Label>테마</Label>
+              <div><ModeToggle /></div>
             </div>
           </CardContent>
         </Card>

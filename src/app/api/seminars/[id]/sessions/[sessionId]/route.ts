@@ -117,9 +117,9 @@ export async function PUT(
     const body = await request.json();
     
     // Validate required fields
-    if (!body.title || !body.date || !body.location) {
+    if (!body.title || !body.date) {
       return NextResponse.json(
-        { error: 'Title, date, and location are required' }, 
+        { error: 'Title and date are required' }, 
         { status: 400 }
       );
     }
@@ -159,7 +159,7 @@ export async function PUT(
         date: body.date,
         location: body.location,
         description: body.description,
-        session_number: body.session_number,
+        duration_minutes: body.duration_minutes || 120,
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)

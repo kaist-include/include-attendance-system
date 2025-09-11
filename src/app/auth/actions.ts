@@ -14,14 +14,22 @@ export async function login(formData: FormData) {
 
   console.log('Attempting server-side login for:', data.email);
 
-  const { error } = await supabase.auth.signInWithPassword(data)
+  const { data: authData, error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
     console.error('Login error:', error.message);
     redirect('/error?message=' + encodeURIComponent(error.message))
   }
 
-  console.log('Login successful, revalidating and redirecting to dashboard');
+  // Verify session is established before redirecting
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  
+  if (sessionError || !session) {
+    console.error('Session verification failed:', sessionError);
+    redirect('/error?message=' + encodeURIComponent('Failed to establish session'))
+  }
+
+  console.log('Login successful, session verified, revalidating and redirecting to dashboard');
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }

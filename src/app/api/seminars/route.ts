@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         semester: seminar.semesters?.name || 'Unknown',
         applicationStart: seminar.application_start,
         applicationEnd: seminar.application_end,
-        applicationType: seminar.application_type,
+
         currentUserEnrollment: currentUserEnrollment ? {
           status: currentUserEnrollment.status,
           applied_at: currentUserEnrollment.applied_at
@@ -105,50 +105,31 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    
-    console.log('🎯 Creating new seminar:', {
-      title: data.title,
-      owner: user.id,
-      applicationType: data.applicationType
-    });
 
-    // Get semester by name from the request
-    const semesterName = data.semester;
-    if (!semesterName) {
-      return NextResponse.json({ error: 'Semester is required' }, { status: 400 });
+    // Get semester_id from the request
+    const semesterId = data.semester_id;
+    if (!semesterId) {
+      return NextResponse.json({ error: 'Semester ID is required' }, { status: 400 });
     }
 
-    // Find or create semester by name
-    let { data: semester, error: semesterError } = await supabase
+    // Verify semester exists and is managed by admin
+    const { data: semester, error: semesterError } = await supabase
       .from('semesters')
-      .select('id')
-      .eq('name', semesterName)
+      .select('id, name, is_active')
+      .eq('id', semesterId)
       .single();
 
     if (semesterError || !semester) {
-      // If semester doesn't exist, create it
-      const { data: newSemester, error: createError } = await supabase
-        .from('semesters')
-        .insert({
-          name: semesterName,
-          start_date: data.start_date || data.startDate,
-          end_date: data.end_date || data.endDate || data.start_date || data.startDate,
-          is_active: false
-        })
-        .select()
-        .single();
+      console.error('Semester not found:', semesterError);
+      return NextResponse.json({ error: 'Invalid semester selected. Please contact admin.' }, { status: 400 });
+    }
 
-             if (createError || !newSemester) {
-         console.error('Error creating semester:', createError);
-         return NextResponse.json({ error: 'Failed to create semester' }, { status: 500 });
-       }
-
-       semester = newSemester;
-     }
-
-     if (!semester) {
-       return NextResponse.json({ error: 'Semester not found' }, { status: 400 });
-     }
+    console.log('🎯 Creating new seminar:', {
+      title: data.title,
+      owner: user.id,
+      semester: semester.name,
+      isActiveSemester: semester.is_active
+    });
 
      // Create seminar
     const { data: seminar, error } = await supabase
@@ -161,9 +142,9 @@ export async function POST(request: NextRequest) {
         end_date: data.end_date || data.endDate,
         location: data.location,
         owner_id: user.id,
-        semester_id: semester.id,
+        semester_id: semesterId,
         status: 'draft',
-        application_type: data.application_type || data.applicationType,
+  
         application_start: data.application_start || data.applicationStart,
         application_end: data.application_end || data.applicationEnd,
         tags: data.tags || [],

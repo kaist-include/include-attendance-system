@@ -47,7 +47,6 @@ export interface Seminar {
   status: SeminarStatus;
   application_start: string;
   application_end: string;
-  application_type: ApplicationType;
   created_at: string;
   updated_at: string;
   
@@ -60,13 +59,12 @@ export interface Seminar {
 }
 
 export type SeminarStatus = 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
-export type ApplicationType = 'first_come' | 'selection';
+
 
 // Session Types
 export interface Session {
   id: string;
   seminar_id: string;
-  session_number: number;
   title: string;
   description?: string;
   date: string;
@@ -188,7 +186,6 @@ export interface CreateSeminarForm {
   tags: string[];
   application_start: string;
   application_end: string;
-  application_type: ApplicationType;
 }
 
 export interface CreateSessionForm {
@@ -289,4 +286,27 @@ export type NotificationType =
   | 'session_reminder'
   | 'seminar_updated'
   | 'announcement'
-  | 'attendance_marked'; 
+  | 'attendance_marked';
+
+// Dashboard Types
+export interface DashboardStats {
+  currentSeminars: number;
+  attendanceRate: number;
+  upcomingSessions: number;
+  completedSeminars: number;
+  totalEnrollments: number;
+  recentActivity: number;
+  currentSemester: string;
+}
+
+export interface DashboardAnnouncement {
+  id: string;
+  title: string;
+  content: string;
+  time: string;
+  isNew: boolean;
+  isGlobal: boolean;
+  isPinned: boolean;
+  seminarTitle?: string;
+  authorName?: string;
+} 
