@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoadingSpinner } from '@/components/ui/spinner';
-import { useRequireAuth } from '@/hooks/useAuth';
+import { useRequireAuth, useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/utils/supabase/client';
 
 interface Applicant {
@@ -37,6 +37,7 @@ export default function SeminarEnrollmentsPage() {
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
   const { user, loading: authLoading } = useRequireAuth();
+  const { isAdmin } = useAuth();
   // canManage will be determined by API ownership check
 
   const [loading, setLoading] = useState(true);
@@ -283,10 +284,10 @@ export default function SeminarEnrollmentsPage() {
                         {a.status === 'approved' ? '승인' : a.status === 'rejected' ? '거절' : '대기'}
                       </span>
                       
-                      {/* Show owner badge instead of action buttons for self-enrollment */}
-                      {a.userId === user?.id ? (
+                      {/* Show different UI based on user type and enrollment ownership */}
+                      {a.userId === user?.id && !isAdmin ? (
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          개설자
+                          본인 신청
                         </Badge>
                       ) : (
                         <>

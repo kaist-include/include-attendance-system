@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sendSeminarPermissionGrantedNotification } from '@/lib/notifications';
 
 // GET - Fetch all permissions for a seminar
 export async function GET(
@@ -49,13 +50,11 @@ export async function GET(
         role,
         created_at,
         user_id,
-        users!inner(
+        granted_by,
+        users!seminar_permissions_user_id_fkey(
           id,
           name,
           email
-        ),
-        granted_by_user:users!seminar_permissions_granted_by_fkey(
-          name
         )
       `)
       .eq('seminar_id', seminarId)
@@ -158,7 +157,7 @@ export async function POST(
         role,
         created_at,
         user_id,
-        users!inner(
+        users!seminar_permissions_user_id_fkey(
           id,
           name,
           email
@@ -169,6 +168,19 @@ export async function POST(
     if (insertError) {
       console.error('Error inserting permission:', insertError);
       return NextResponse.json({ error: 'Failed to add permission' }, { status: 500 });
+    }
+
+    // Send notification to user about permission grant
+    try {
+      await sendSeminarPermissionGrantedNotification(
+        userId,
+        seminar.title,
+        seminarId,
+        role
+      );
+    } catch (notificationError) {
+      console.error('Failed to send permission grant notification:', notificationError);
+      // Don't fail the permission grant if notification fails
     }
 
     return NextResponse.json(permission);

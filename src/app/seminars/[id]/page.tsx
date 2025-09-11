@@ -733,12 +733,7 @@ export default function SeminarDetailPage() {
                 내 출석 현황
               </Button>
             )}
-            {!user ? (
-              <Button onClick={handleEnroll}>
-                <UserPlus className="w-4 h-4 mr-2" />
-                신청하기
-              </Button>
-            ) : seminarData.currentUserEnrollment ? (
+            {seminarData.currentUserEnrollment ? (
               // 이미 신청한 사용자 - 모든 신청은 승인 대기
               seminarData.currentUserEnrollment.status === 'pending' ? (
                 <Button variant="secondary" disabled>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sendSeminarCreatedNotification } from '@/lib/notifications';
 
 export async function GET(request: NextRequest) {
   try {
@@ -178,6 +179,28 @@ export async function POST(request: NextRequest) {
       // Don't fail the seminar creation if enrollment fails - just log it
     } else {
       console.log('✅ Creator automatically enrolled in seminar');
+    }
+
+    // Send notification about new seminar to all users (respecting RLS)
+    try {
+      // Get user profile for notification
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('name, email')
+        .eq('id', user.id)
+        .single();
+
+      const ownerName = userProfile?.name || userProfile?.email?.split('@')[0] || '익명';
+      
+      await sendSeminarCreatedNotification(
+        seminar.id,
+        seminar.title,
+        ownerName,
+        seminar.description || ''
+      );
+    } catch (notificationError) {
+      console.error('Failed to send seminar creation notification:', notificationError);
+      // Don't fail the seminar creation if notification fails
     }
 
     return NextResponse.json({ seminar });

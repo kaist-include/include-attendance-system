@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ModeToggle } from '@/components/ui/theme-toggle';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import {
   Sidebar,
   SidebarContent,
@@ -69,6 +71,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const { user, profile, isAdmin } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
 
   const handleSignOut = async () => {
     try {
@@ -185,11 +195,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
               <div className="flex items-center space-x-2">
                 {/* Notifications */}
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
-                </Button>
-                                  <ModeToggle />
+                <NotificationDropdown
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  loading={notificationsLoading}
+                  onMarkAsRead={markAsRead}
+                  onMarkAllAsRead={markAllAsRead}
+                />
+                <ModeToggle />
 
                 {/* User Avatar */}
                 <Link

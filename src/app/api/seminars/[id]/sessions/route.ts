@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sendSessionCreatedNotification } from '@/lib/notifications';
 
 // Helper function to recalculate seminar start/end dates based on sessions
 async function updateSeminarDates(seminarId: string, supabase: any) {
