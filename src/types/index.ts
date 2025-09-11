@@ -43,6 +43,7 @@ export interface Seminar {
   start_date: string;
   end_date?: string;
   location?: string;
+  external_url?: string;
   tags: string[];
   status: SeminarStatus;
   application_start: string;
@@ -70,7 +71,7 @@ export interface Session {
   date: string;
   duration_minutes: number;
   location?: string;
-  materials_url?: string;
+  external_url?: string;
   status: SessionStatus;
   created_at: string;
   updated_at: string;

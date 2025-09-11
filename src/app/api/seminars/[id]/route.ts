@@ -47,7 +47,7 @@ export async function GET(
           location,
   
           status,
-          materials_url
+          external_url
         )
       `)
       .eq('id', seminarId)
@@ -175,6 +175,9 @@ export async function PUT(
     if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
     if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
     if (updates.location !== undefined) updateData.location = updates.location;
+    if (updates.external_url !== undefined || updates.externalUrl !== undefined) {
+      updateData.external_url = updates.external_url || updates.externalUrl || null;
+    }
     if (updates.tags !== undefined) updateData.tags = updates.tags;
     if (updates.applicationStart !== undefined) updateData.application_start = updates.applicationStart;
     if (updates.applicationEnd !== undefined) updateData.application_end = updates.applicationEnd;

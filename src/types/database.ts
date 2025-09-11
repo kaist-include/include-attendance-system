@@ -97,6 +97,7 @@ export type Database = {
           status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
           application_start: string;
           application_end: string;
+          external_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -114,6 +115,7 @@ export type Database = {
           status?: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
           application_start: string;
           application_end: string;
+          external_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -129,6 +131,7 @@ export type Database = {
           status?: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
           application_start?: string;
           application_end?: string;
+          external_url?: string | null;
           updated_at?: string;
         };
       };
@@ -141,7 +144,7 @@ export type Database = {
           date: string;
           duration_minutes: number;
           location: string | null;
-          materials_url: string | null;
+          external_url: string | null;
           status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
           created_at: string;
           updated_at: string;
@@ -154,7 +157,7 @@ export type Database = {
           date: string;
           duration_minutes: number;
           location?: string | null;
-          materials_url?: string | null;
+          external_url?: string | null;
           status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
           created_at?: string;
           updated_at?: string;
@@ -166,7 +169,7 @@ export type Database = {
           date?: string;
           duration_minutes?: number;
           location?: string | null;
-          materials_url?: string | null;
+          external_url?: string | null;
           status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
           updated_at?: string;
         };
@@ -312,6 +315,31 @@ export type Database = {
           read_at?: string | null;
         };
       };
+      seminar_permissions: {
+        Row: {
+          id: string;
+          seminar_id: string;
+          user_id: string;
+          role: 'assistant' | 'moderator';
+          granted_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          seminar_id: string;
+          user_id: string;
+          role: 'assistant' | 'moderator';
+          granted_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          role?: 'assistant' | 'moderator';
+          granted_by?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -321,6 +349,7 @@ export type Database = {
     };
     Enums: {
       user_role: 'admin' | 'member';
+      seminar_role: 'assistant' | 'moderator';
       seminar_status: 'draft' | 'recruiting' | 'in_progress' | 'completed' | 'cancelled';
       session_status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
       enrollment_status: 'pending' | 'approved' | 'rejected' | 'cancelled';

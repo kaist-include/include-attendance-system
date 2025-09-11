@@ -93,7 +93,7 @@ export async function POST(
     }
 
     // Parse request body
-    const { title, description, date, duration_minutes, location } = await request.json();
+    const { title, description, date, duration_minutes, location, external_url } = await request.json();
 
     if (!title || !date || !duration_minutes) {
       return NextResponse.json({ 
@@ -111,6 +111,7 @@ export async function POST(
         date,
         duration_minutes,
         location: location || null,
+        external_url: external_url || null,
         status: 'scheduled'
       })
       .select()

@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
         start_date: data.start_date || data.startDate,
         end_date: data.end_date || data.endDate,
         location: data.location,
+        external_url: data.external_url || data.externalUrl || null,
         owner_id: user.id,
         semester_id: semesterId,
         status: 'draft',

@@ -38,6 +38,7 @@ export default function CreateSeminarPage() {
     application_start: undefined as Date | undefined,
     application_end: undefined as Date | undefined,
     location: '',
+    external_url: '',
 
     tags: [] as string[],
     tagInput: '',
@@ -102,6 +103,7 @@ export default function CreateSeminarPage() {
           start_date: form.start_date.toISOString().split('T')[0],
           end_date: form.end_date ? form.end_date.toISOString().split('T')[0] : null,
           location: form.location || null,
+          external_url: form.external_url || null,
     
           application_start: form.application_start.toISOString(),
           application_end: form.application_end ? 
@@ -250,6 +252,16 @@ export default function CreateSeminarPage() {
                     value={form.location}
                     onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
                     placeholder="온라인, 오프라인 등"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="external_url">참고 링크 (선택사항)</Label>
+                  <Input
+                    id="external_url"
+                    type="url"
+                    value={form.external_url}
+                    onChange={e => setForm(f => ({ ...f, external_url: e.target.value }))}
+                    placeholder="https://example.com"
                   />
                 </div>
               </div>
