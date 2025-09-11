@@ -1,15 +1,24 @@
+'use client';
+
 import Link from 'next/link';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
 import { login } from '@/app/auth/actions';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const message = searchParams.get('message');
+  const isSignupSuccess = message === 'signup-success';
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -24,6 +33,21 @@ export default function LoginPage() {
           </Link>
           <p className="text-muted-foreground mt-2">출석 관리 시스템에 로그인하세요</p>
         </div>
+
+        {/* 회원가입 성공 메시지 */}
+        {isSignupSuccess && (
+          <Alert variant="success" className="mb-6">
+            <CheckCircle className="h-4 w-4" />
+            <AlertTitle>이메일 인증 링크를 발송했습니다!</AlertTitle>
+            <AlertDescription>
+              회원가입이 완료되었습니다. 등록하신 이메일로 인증 링크를 발송했습니다.
+              <br />
+              <strong>이메일이 도착하지 않았다면 스팸 메일함을 확인해주세요.</strong>
+              <br />
+              인증 완료 후 로그인할 수 있습니다.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card className="shadow-lg">
           <CardHeader className="text-center">
@@ -97,5 +121,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 } 
