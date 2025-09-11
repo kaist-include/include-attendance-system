@@ -11,65 +11,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    console.log('🔄 Syncing user to users table:', user.id);
-    console.log('📊 User metadata:', {
-      email: user.email,
-      user_metadata: user.user_metadata,
-      app_metadata: user.app_metadata
-    });
+    console.log('🔄 Quick user sync for:', user.id);
 
-    console.log('🔑 Using authenticated Supabase client with RLS');
-
-    // Check if user already exists in users table
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (existingUser) {
-      console.log('✅ User already exists in users table');
-      return NextResponse.json({ 
-        message: 'User already exists',
-        user: existingUser 
-      });
-    }
-
-    console.log('📝 Creating user record in users table');
-
-    // Extract user info
+    // Extract user info early
     const email = user.email || '';
     const name = user.user_metadata?.name || 
                  user.user_metadata?.full_name || 
                  email.split('@')[0] || 
                  'User';
 
-    // Create user record
-    console.log('📝 Attempting to create user with data:', {
-      id: user.id,
-      email: email,
-      name: name,
-      role: 'member'
-    });
-
-    const { data: newUser, error: createError } = await supabase
+    // Try to upsert (insert or update) user in one operation
+    const { data: upsertedUser, error: upsertError } = await supabase
       .from('users')
-      .insert({
+      .upsert({
         id: user.id,
         email: email,
         name: name,
         role: 'member',
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
       })
       .select()
       .single();
 
-    if (createError) {
-      console.error('❌ Failed to create user:', createError);
+    if (upsertError) {
+      console.error('❌ User upsert failed:', upsertError);
       
-      // If user creation failed due to RLS, they might need admin assistance
-      if (createError.code === '42501') {
+      // If upsert failed due to RLS, return the error
+      if (upsertError.code === '42501') {
         return NextResponse.json({ 
           error: 'User creation requires admin assistance',
           details: 'Please contact an administrator to create your user record'
@@ -77,49 +48,44 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json({ 
-        error: 'Failed to create user record',
-        details: createError.message,
-        code: createError.code
+        error: 'Failed to sync user record',
+        details: upsertError.message,
+        code: upsertError.code
       }, { status: 500 });
     }
 
-    console.log('✅ Created user record:', newUser);
+    console.log('✅ User upserted successfully:', upsertedUser);
 
-    // Also check/create profile record if it doesn't exist
-    const { data: existingProfile } = await supabase
+    // Try to upsert profile in parallel (non-blocking)
+    supabase
       .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-
-    if (!existingProfile) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: user.id,
-          name: name,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-      if (profileError) {
-        console.warn('⚠️ Profile creation failed, but user created successfully:', profileError);
-      } else {
-        console.log('✅ Created profile record');
-      }
-    }
+      .upsert({
+        id: user.id,
+        name: name,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      })
+      .then(({ error: profileError }) => {
+        if (profileError) {
+          console.warn('⚠️ Profile upsert failed:', profileError);
+        } else {
+          console.log('✅ Profile upserted successfully');
+        }
+      });
 
     console.log('🎉 User sync completed successfully');
 
     return NextResponse.json({
       message: 'User sync completed successfully',
-      user: newUser,
-      operation: 'created'
+      user: upsertedUser,
+      operation: upsertedUser ? 'upserted' : 'existing'
     });
 
   } catch (error) {
     console.error('❌ User Sync API error:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });

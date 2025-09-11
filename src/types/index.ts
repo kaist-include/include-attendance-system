@@ -197,7 +197,7 @@ export interface CreateSessionForm {
   date: string;
   duration_minutes: number;
   location?: string;
-  materials_url?: string;
+  external_url?: string;
 }
 
 export interface UpdateProfileForm {

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/spinner';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { StatsSkeleton, AnnouncementsSkeleton, SessionsSkeleton } from '@/components/ui/skeleton';
 import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2, Eye } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { DashboardStats, DashboardAnnouncement } from '@/types';
@@ -26,7 +27,7 @@ interface UpcomingSession {
 
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
-  const { profile } = useAuth();
+  const { profile, userRole } = useAuth();
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [weekRangeLabel, setWeekRangeLabel] = useState<string>("");
@@ -42,155 +43,133 @@ export default function DashboardPage() {
     setWeekRangeLabel(end.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }));
   }, []);
 
-  // Fetch dashboard statistics
+  // Fetch all dashboard data in parallel once user is available
   useEffect(() => {
+    if (!user?.id) return;
+
     let cancelled = false;
 
-    const fetchStats = async () => {
-      if (!user?.id || cancelled) {
-        if (!cancelled) setStatsLoading(false);
-        return;
-      }
-
-      try {
-        setStatsLoading(true);
-        const response = await fetch('/api/dashboard/stats');
-        
-        if (cancelled) return;
-
-        if (response.ok) {
-          const data = await response.json();
-          if (!cancelled) {
-            setStats(data);
-          }
-        } else {
-          console.error('Failed to fetch dashboard stats:', response.status);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Error fetching dashboard stats:', error);
-        }
-      } finally {
-        if (!cancelled) {
-          setStatsLoading(false);
-        }
-      }
-    };
-
-    fetchStats();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
-
-  // Fetch announcements
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchAnnouncements = async () => {
-      if (!user?.id || cancelled) {
-        if (!cancelled) setAnnouncementsLoading(false);
-        return;
-      }
-
-      try {
-        setAnnouncementsLoading(true);
-        const response = await fetch('/api/dashboard/announcements');
-        
-        if (cancelled) return;
-
-        if (response.ok) {
-          const data = await response.json();
-          if (!cancelled) {
-            setAnnouncements(data);
-          }
-        } else {
-          console.error('Failed to fetch announcements:', response.status);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Error fetching announcements:', error);
-        }
-      } finally {
-        if (!cancelled) {
-          setAnnouncementsLoading(false);
-        }
-      }
-    };
-
-    fetchAnnouncements();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
-
-
-
-  // Fetch upcoming sessions
-  useEffect(() => {
-    let cancelled = false;
-    
-    const fetchUpcomingSessions = async () => {
-      if (!user?.id || cancelled) {
-        if (!cancelled) setSessionsLoading(false);
-        return;
-      }
+    const fetchAllDashboardData = async () => {
+      console.log('🚀 Starting dashboard data fetch for user:', user.email);
       
       try {
-        setSessionsLoading(true);
-        
-        // With SSR pattern, auth is handled automatically by middleware
-        if (!user?.id || cancelled) {
-          if (!cancelled) setSessionsLoading(false);
-          return;
-        }
+        // Start all API calls in parallel for better performance
+        const [statsPromise, announcementsPromise, sessionsPromise] = [
+          fetch('/api/dashboard/stats'),
+          fetch('/api/dashboard/announcements'),
+          fetch('/api/sessions/upcoming')
+        ];
 
-        const response = await fetch('/api/sessions/upcoming', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        // Handle stats
+        statsPromise.then(async (response) => {
+          if (cancelled) return;
+          try {
+            if (response.ok) {
+              const data = await response.json();
+              if (!cancelled) {
+                setStats(data);
+                console.log('✅ Dashboard stats loaded');
+              }
+            } else {
+              console.error('Failed to fetch dashboard stats:', response.status);
+            }
+          } catch (error) {
+            console.error('Error processing dashboard stats:', error);
+          } finally {
+            if (!cancelled) setStatsLoading(false);
+          }
+        }).catch(error => {
+          if (!cancelled) {
+            console.error('Error fetching dashboard stats:', error);
+            setStatsLoading(false);
+          }
         });
 
-        if (cancelled) return;
-
-        if (response.ok) {
-          const data = await response.json();
-          if (!cancelled) {
-            setUpcomingSessions(data);
+        // Handle announcements
+        announcementsPromise.then(async (response) => {
+          if (cancelled) return;
+          try {
+            if (response.ok) {
+              const data = await response.json();
+              if (!cancelled) {
+                setAnnouncements(data);
+                console.log('✅ Dashboard announcements loaded');
+              }
+            } else {
+              console.error('Failed to fetch announcements:', response.status);
+            }
+          } catch (error) {
+            console.error('Error processing announcements:', error);
+          } finally {
+            if (!cancelled) setAnnouncementsLoading(false);
           }
-        } else {
-          const errorText = await response.text();
-          console.error('Failed to fetch upcoming sessions:', response.status, errorText);
-        }
+        }).catch(error => {
+          if (!cancelled) {
+            console.error('Error fetching announcements:', error);
+            setAnnouncementsLoading(false);
+          }
+        });
+
+        // Handle sessions
+        sessionsPromise.then(async (response) => {
+          if (cancelled) return;
+          try {
+            if (response.ok) {
+              const data = await response.json();
+              if (!cancelled) {
+                setUpcomingSessions(data);
+                console.log('✅ Upcoming sessions loaded');
+              }
+            } else {
+              const errorText = await response.text();
+              console.error('Failed to fetch upcoming sessions:', response.status, errorText);
+            }
+          } catch (error) {
+            console.error('Error processing upcoming sessions:', error);
+          } finally {
+            if (!cancelled) setSessionsLoading(false);
+          }
+        }).catch(error => {
+          if (!cancelled) {
+            console.error('Error fetching upcoming sessions:', error);
+            setSessionsLoading(false);
+          }
+        });
+
       } catch (error) {
+        console.error('Error starting dashboard data fetch:', error);
+        // Set all loading states to false on error
         if (!cancelled) {
-          console.error('Error fetching upcoming sessions:', error);
-        }
-      } finally {
-        if (!cancelled) {
+          setStatsLoading(false);
+          setAnnouncementsLoading(false);
           setSessionsLoading(false);
         }
       }
     };
 
-    fetchUpcomingSessions();
+    fetchAllDashboardData();
 
-    // Cleanup function to cancel the request if component unmounts or effect re-runs
     return () => {
       cancelled = true;
     };
-  }, [user?.id]); // Use user.id instead of user object to reduce re-renders
+  }, [user?.id]);
 
+  // Show loading only for initial auth, not for dashboard data
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" />
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            인증 확인 중...
+          </p>
+        </div>
       </div>
     );
   }
+
+  // Show dashboard immediately once user is authenticated
+  // Individual sections will show their own loading states
 
   // 통계 카드 데이터 구성
   const statsCards = [
@@ -244,38 +223,38 @@ export default function DashboardPage() {
 
         {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statsCards.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={index} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                    <Icon className={`w-4 h-4 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {(statsLoading || sessionsLoading) ? (
-                      <Loader2 className="w-6 h-6 animate-spin inline" />
-                    ) : (
-                      stat.value
+          {statsLoading ? (
+            <StatsSkeleton />
+          ) : (
+            statsCards.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <Card key={index} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {stat.title}
+                    </CardTitle>
+                    <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                      <Icon className={`w-4 h-4 ${stat.color}`} />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-foreground">
+                      {stat.value}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                    {/* Add Progress bar for attendance rate */}
+                    {index === 1 && !statsLoading && (
+                      <Progress 
+                        value={stats?.attendanceRate || 0} 
+                        className="mt-3 h-2 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
+                      />
                     )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
-                  {/* Add Progress bar for attendance rate */}
-                  {index === 1 && !statsLoading && (
-                    <Progress 
-                      value={stats?.attendanceRate || 0} 
-                      className="mt-3 h-2 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -292,10 +271,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {sessionsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                  <span className="ml-2 text-muted-foreground">세션을 불러오는 중...</span>
-                </div>
+                <SessionsSkeleton />
               ) : (
                 <>
                   {upcomingSessions.map((session) => (
@@ -346,10 +322,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {announcementsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-green-600" />
-                  <span className="ml-2 text-muted-foreground">공지사항을 불러오는 중...</span>
-                </div>
+                <AnnouncementsSkeleton />
               ) : (
                 <>
                   {announcements.map((announcement) => (

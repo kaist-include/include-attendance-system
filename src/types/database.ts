@@ -231,6 +231,37 @@ export type Database = {
           qr_code?: string | null;
         };
       };
+      qr_codes: {
+        Row: {
+          id: string;
+          session_id: string;
+          seminar_id: string;
+          qr_code: string;
+          numeric_code: string;
+          expires_at: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          seminar_id: string;
+          qr_code: string;
+          numeric_code: string;
+          expires_at: string;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          session_id?: string;
+          seminar_id?: string;
+          qr_code?: string;
+          numeric_code?: string;
+          expires_at?: string;
+          created_by?: string;
+          created_at?: string;
+        };
+      };
       announcements: {
         Row: {
           id: string;

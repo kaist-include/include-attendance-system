@@ -32,13 +32,17 @@ export const useAuthProvider = (): AuthContextType => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userDataLoading, setUserDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user data (both profile and role)
+  // Load user data (both profile and role) - now non-blocking
   const loadUserData = useCallback(async (userId: string) => {
     const supabase = createClient();
     
     try {
+      setUserDataLoading(true);
+      console.log('🔄 Loading user data for:', userId);
+      
       // Load user role from users table
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -51,46 +55,52 @@ export const useAuthProvider = (): AuthContextType => {
         
         // If user doesn't exist in users table, try to sync/create the user
         if (userError.code === 'PGRST116') {
-          console.log('🔄 User not found in users table, attempting to sync...');
+          console.log('🔄 User not found in users table, attempting to sync in background...');
           
           try {
-            // Get current session for API call
-            const { data: sessionData } = await supabase.auth.getSession();
-            const session = sessionData?.session;
-            
-            if (session?.access_token) {
-              const response = await fetch('/api/users/sync', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-              });
-              
+            // Don't await this - let it happen in background
+            fetch('/api/users/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            }).then(async (response) => {
               if (response.ok) {
-                const result = await response.json();
-                console.log('✅ User synced successfully:', result.user);
-                setUserRole(result.user.role as UserRole);
+                const syncResult = await response.json();
+                console.log('✅ Background user sync completed:', syncResult);
+                // Retry loading user data after sync
+                const { data: retryUserData } = await supabase
+                  .from('users')
+                  .select('role')
+                  .eq('id', userId)
+                  .single();
+                
+                if (retryUserData?.role) {
+                  setUserRole(retryUserData.role);
+                  console.log('✅ User role loaded after sync:', retryUserData.role);
+                }
               } else {
-                console.error('❌ Failed to sync user');
-                setUserRole('member' as UserRole); // Fallback
+                console.error('❌ Background user sync failed:', response.status);
               }
-            } else {
-              console.error('❌ No session token available for sync');
-              setUserRole('member' as UserRole); // Fallback
-            }
+            }).catch(err => {
+              console.error('❌ Background user sync error:', err);
+            });
+            
+            // Set default role for now
+            setUserRole('member');
+            console.log('🔄 Using default role "member" while sync completes in background');
           } catch (syncError) {
-            console.error('❌ Error during user sync:', syncError);
-            setUserRole('member' as UserRole); // Fallback
+            console.error('Failed to sync user:', syncError);
+            setUserRole('member'); // Default fallback
           }
         } else {
-          throw userError;
+          console.error('Database error loading user:', userError);
+          setUserRole('member'); // Default fallback
         }
       } else {
-        setUserRole(userData.role as UserRole);
+        setUserRole(userData.role);
+        console.log('✅ User role loaded:', userData.role);
       }
 
-      // Load user profile
+      // Load profile from profiles table (also non-blocking)
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -98,55 +108,153 @@ export const useAuthProvider = (): AuthContextType => {
         .single();
 
       if (profileError) {
-        // If profile doesn't exist, create one
-        if (profileError.code === 'PGRST116') {
-          console.log('Profile not found, creating profile...');
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: userId,
-              nickname: user?.user_metadata?.name || '',
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Error creating profile:', createError);
-            throw createError;
-          }
-          
-          console.log('Profile created successfully:', newProfile);
-          setProfile(newProfile);
-        } else {
-          throw profileError;
-        }
+        console.error('Error loading profile:', profileError);
+        // Create a basic profile from user metadata
+        const basicProfile = {
+          id: userId,
+          user_id: userId,
+          nickname: user?.user_metadata?.name || user?.email?.split('@')[0] || 'User',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setProfile(basicProfile);
       } else {
         setProfile(profileData);
+        console.log('✅ Profile loaded successfully');
       }
+
     } catch (err) {
-      console.error('Error loading user data:', err);
+      console.error('Error in loadUserData:', err);
+      // Set defaults so the app can still function
+      setUserRole('member');
+      setProfile({
+        id: userId,
+        user_id: userId,
+        nickname: user?.user_metadata?.name || 'User',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
       setError(getErrorMessage(err));
+    } finally {
+      setUserDataLoading(false);
     }
-  }, [user?.user_metadata?.name]);
+  }, [user?.user_metadata?.name, user?.email]);
 
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    let sessionPollInterval: NodeJS.Timeout | null = null;
     const supabase = createClient();
+
+    const checkForSession = async (): Promise<boolean> => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log('✅ Session found:', session.user.email);
+          if (mounted) {
+            setUser(session.user);
+            loadUserData(session.user.id).catch(err => {
+              console.error('Background user data loading failed:', err);
+            });
+          }
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error checking session:', error);
+        return false;
+      }
+    };
 
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Try multiple approaches to get the session
+        console.log('🔄 Starting auth initialization...');
+        
+        // First, try to get the session normally
+        let { data: { session } } = await supabase.auth.getSession();
+        
+        // If no session found, try refreshing the session
+        if (!session) {
+          console.log('⚠️ No initial session found, attempting to refresh...');
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshData?.session && !refreshError) {
+            session = refreshData.session;
+            console.log('✅ Session refreshed successfully');
+          } else {
+            console.log('❌ Session refresh failed:', refreshError);
+          }
+        }
         
         console.log(`Initial auth check: ${session?.user ? session.user.email : 'No session'}`);
+        
+        // Mobile debugging: Check if we're on mobile and log storage availability
+        if (typeof window !== 'undefined') {
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            console.log('🔍 Mobile device detected - checking storage capabilities');
+            
+            // Test localStorage availability
+            try {
+              localStorage.setItem('test', 'test');
+              localStorage.removeItem('test');
+              console.log('✅ localStorage available on mobile');
+            } catch (e) {
+              console.warn('⚠️ localStorage not available on mobile, using cookie fallback');
+            }
+            
+            // Check cookie support
+            const cookiesEnabled = navigator.cookieEnabled;
+            console.log(`🍪 Cookies enabled: ${cookiesEnabled}`);
+            
+            // Check for existing auth cookies
+            const authCookies = document.cookie.split(';').filter(cookie => 
+              cookie.trim().includes('sb-') || cookie.trim().includes('auth')
+            );
+            console.log(`🔑 Found ${authCookies.length} potential auth cookies`);
+            
+            // Log actual cookie names for debugging
+            if (authCookies.length > 0) {
+              console.log('🔑 Auth cookie names:', authCookies.map(c => c.trim().split('=')[0]));
+            }
+          }
+        }
         
         if (mounted) {
           if (session?.user) {
             setUser(session.user);
-            await loadUserData(session.user.id);
+            // Load user data in background - don't block auth loading
+            loadUserData(session.user.id).catch(err => {
+              console.error('Background user data loading failed:', err);
+            });
+          } else {
+            // Start polling for session if not found immediately
+            console.log('🔄 Starting session polling...');
+            let pollAttempts = 0;
+            const maxPollAttempts = 10; // Poll for up to 10 seconds
+            
+            sessionPollInterval = setInterval(async () => {
+              if (!mounted) return;
+              
+              pollAttempts++;
+              console.log(`🔄 Session poll attempt ${pollAttempts}/${maxPollAttempts}`);
+              
+              const sessionFound = await checkForSession();
+              if (sessionFound || pollAttempts >= maxPollAttempts) {
+                if (sessionPollInterval) {
+                  clearInterval(sessionPollInterval);
+                  sessionPollInterval = null;
+                }
+                
+                if (!sessionFound) {
+                  console.log('❌ Session polling completed - no session found');
+                }
+              }
+            }, 1000); // Poll every second
           }
+          // Set loading to false immediately after session check
           setLoading(false);
+          console.log('✅ Auth initialization completed - UI unblocked');
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
@@ -159,34 +267,61 @@ export const useAuthProvider = (): AuthContextType => {
 
     initializeAuth();
 
-    // Listen for auth changes
+    // Listen for auth changes with enhanced mobile logging
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
 
         console.log(`Auth state change: ${event}, User: ${session?.user ? session.user.email : 'None'}`);
+        
+        // Clear polling if we get an auth state change
+        if (sessionPollInterval) {
+          clearInterval(sessionPollInterval);
+          sessionPollInterval = null;
+        }
+        
+        // Enhanced mobile logging for auth changes
+        if (typeof window !== 'undefined') {
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          if (isMobile) {
+            console.log(`📱 Mobile auth event: ${event}`);
+            if (event === 'SIGNED_IN') {
+              console.log('✅ Mobile sign-in successful - session should persist');
+            } else if (event === 'SIGNED_OUT') {
+              console.log('🚪 Mobile sign-out - clearing storage');
+            } else if (event === 'TOKEN_REFRESHED') {
+              console.log('🔄 Mobile token refresh - session maintained');
+            }
+          }
+        }
 
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
-          // Use setTimeout to defer async operations and prevent deadlock
-          setTimeout(async () => {
-          await loadUserData(session.user.id);
-          }, 0);
+          // Load user data in background - don't block auth state changes
+          loadUserData(session.user.id).catch(err => {
+            console.error('Background user data loading failed:', err);
+          });
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
           setUserRole(null);
         }
         
-        setLoading(false);
+        // Don't set loading to false here if it's already false
+        if (loading) {
+          setLoading(false);
+        }
       }
     );
 
     return () => {
       mounted = false;
+      if (sessionPollInterval) {
+        clearInterval(sessionPollInterval);
+      }
       subscription.unsubscribe();
     };
-  }, [loadUserData]);
+  }, [loadUserData, loading]);
 
   // Update profile
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -249,31 +384,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 // Protected route hook
 export const useRequireAuth = (redirectTo = '/login') => {
   const { user, loading } = useAuth();
-  const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
     if (!loading) {
-      // Add a small delay to allow for session sync after login
-      const checkAuth = setTimeout(() => {
-        setHasChecked(true);
-        // Temporarily disable client-side redirect to debug
-        // Let middleware handle all redirects for now
-        if (!user) {
-          console.log('useRequireAuth: No user found, but letting middleware handle redirect');
-          // window.location.href = redirectTo;
-        } else {
-          console.log('useRequireAuth: User found:', user.email);
-        }
-      }, 200); // Increased delay to 200ms
-
-      return () => clearTimeout(checkAuth);
+      if (!user) {
+        console.log('useRequireAuth: No user found, trusting middleware to handle redirect');
+      } else {
+        console.log('useRequireAuth: User found:', user.email);
+      }
     }
   }, [user, loading, redirectTo]);
 
-  // Don't render content until we've checked auth status
-  const isReady = !loading && (user || hasChecked);
-  
-  return { user, loading: !isReady };
+  // Just return the auth state - let middleware handle redirects
+  return { user, loading };
 };
 
 // Role-based access hook

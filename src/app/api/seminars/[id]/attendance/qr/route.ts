@@ -62,12 +62,27 @@ export async function POST(
 
     // Generate QR code token and 6-digit numeric code (valid for 10 minutes)
     const qrCode = randomBytes(16).toString('hex');
-    const numericCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+    const numericCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // TODO: Store QR codes in a separate table for better management
-    // For now, we'll return the QR code data without storing it persistently
-    console.log('✅ QR code generated for session:', sessionId);
+    // Store QR codes in database for verification
+    const { error: insertError } = await supabase
+      .from('qr_codes')
+      .insert({
+        session_id: sessionId,
+        seminar_id: seminarId,
+        qr_code: qrCode,
+        numeric_code: numericCode,
+        expires_at: expiresAt.toISOString(),
+        created_by: user.id,
+      });
+
+    if (insertError) {
+      console.error('Error storing QR code:', insertError);
+      return NextResponse.json({ error: 'Failed to generate QR code' }, { status: 500 });
+    }
+
+    console.log('✅ QR code generated and stored for session:', sessionId);
 
     // Create scannable URL for QR code
     const host = request.headers.get('host') || 'localhost:3000';
@@ -116,9 +131,21 @@ export async function PUT(
     let sessionId, qrCode, expiresAt;
     
     if (numericCode) {
-      // TODO: Implement proper QR code lookup from QR codes table
-      // For now, we'll disable numeric code verification
-      return NextResponse.json({ error: 'Numeric code verification not yet implemented' }, { status: 501 });
+      // Look up numeric code in qr_codes table
+      const { data: qrCodeData, error: qrCodeError } = await supabase
+        .from('qr_codes')
+        .select('session_id, qr_code, expires_at, seminar_id')
+        .eq('numeric_code', numericCode)
+        .eq('seminar_id', seminarId)
+        .single();
+
+      if (qrCodeError || !qrCodeData) {
+        return NextResponse.json({ error: 'Invalid or expired numeric code' }, { status: 400 });
+      }
+
+      sessionId = qrCodeData.session_id;
+      qrCode = qrCodeData.qr_code;
+      expiresAt = qrCodeData.expires_at;
     } else {
       // Handle QR data input
       let parsedQrData;
@@ -140,48 +167,73 @@ export async function PUT(
       return NextResponse.json({ error: 'QR code has expired' }, { status: 400 });
     }
 
-    // Verify QR code against session
+    // Verify session exists and get seminar info
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('materials_url, seminar_id')
+      .select(`
+        id,
+        seminar_id,
+        external_url,
+        seminars!inner (
+          id,
+          title,
+          owner_id
+        )
+      `)
       .eq('id', sessionId)
       .eq('seminar_id', seminarId)
       .single();
 
     if (sessionError || !session) {
+      console.error('Session lookup error:', sessionError);
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Parse materials_url to get QR data
-    let sessionQrData;
-    try {
-      sessionQrData = JSON.parse(session.materials_url);
-    } catch (e) {
-      return NextResponse.json({ error: 'No active QR code for this session' }, { status: 400 });
-    }
+    // For numeric codes, we already verified the code exists in qr_codes table
+    // For QR codes, verify the QR code exists in qr_codes table
+    if (!numericCode) {
+      // Verify QR code exists in our qr_codes table
+      const { data: storedQrCode, error: qrVerifyError } = await supabase
+        .from('qr_codes')
+        .select('id, expires_at')
+        .eq('qr_code', qrCode)
+        .eq('session_id', sessionId)
+        .eq('seminar_id', seminarId)
+        .single();
 
-    // Verify QR code matches
-    if (sessionQrData.qr_code !== qrCode) {
-      return NextResponse.json({ error: 'Invalid QR code' }, { status: 400 });
-    }
+      if (qrVerifyError || !storedQrCode) {
+        console.error('QR code verification error:', qrVerifyError);
+        return NextResponse.json({ error: 'Invalid or expired QR code' }, { status: 400 });
+      }
 
-    // Check if QR code is still valid (server-side expiration check)
-    if (new Date() > new Date(sessionQrData.expires_at)) {
-      return NextResponse.json({ error: 'QR code has expired' }, { status: 400 });
+      // Double-check expiration from stored data
+      if (new Date() > new Date(storedQrCode.expires_at)) {
+        return NextResponse.json({ error: 'QR code has expired' }, { status: 400 });
+      }
     }
 
     // Check if user is enrolled in the seminar
     const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
-      .select('id')
+      .select('id, status')
       .eq('user_id', user.id)
       .eq('seminar_id', seminarId)
       .eq('status', 'approved')
       .single();
 
     if (enrollmentError || !enrollment) {
-      return NextResponse.json({ error: 'User is not enrolled in this seminar' }, { status: 400 });
+      console.error('Enrollment check error:', enrollmentError);
+      console.log('User enrollment check - User ID:', user.id, 'Seminar ID:', seminarId);
+      return NextResponse.json({ error: 'You are not enrolled in this seminar or your enrollment is not approved' }, { status: 403 });
     }
+
+    // Check if attendance already exists (allow updates)
+    const { data: existingAttendance } = await supabase
+      .from('attendances')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .eq('session_id', sessionId)
+      .single();
 
     // Mark attendance
     const { data: attendance, error: attendanceError } = await supabase
@@ -191,28 +243,32 @@ export async function PUT(
         session_id: sessionId,
         status: 'present',
         checked_at: new Date().toISOString(),
-        checked_by: user.id, // Self-checked via QR/numeric code
-        notes: `QR 코드로 자동 출석 확인 (${new Date().toLocaleString('ko-KR')})`
+        qr_code: qrCode,
+      }, {
+        onConflict: 'user_id,session_id'
       })
       .select()
       .single();
 
     if (attendanceError) {
-      console.error('Error marking attendance:', attendanceError);
-      return NextResponse.json({ error: 'Failed to mark attendance' }, { status: 500 });
+      console.error('Attendance recording error:', attendanceError);
+      return NextResponse.json({ error: 'Failed to record attendance' }, { status: 500 });
     }
 
-    // Get seminar title for response
-    const { data: seminarInfo } = await supabase
-      .from('seminars')
-      .select('title')
-      .eq('id', seminarId)
-      .single();
+    console.log('✅ Attendance successfully recorded:', attendance);
+
+    // Clean up expired QR codes (older than current time)
+    await supabase
+      .from('qr_codes')
+      .delete()
+      .lt('expires_at', new Date().toISOString());
 
     return NextResponse.json({ 
-      message: 'Attendance marked successfully',
-      attendance,
-      seminarTitle: seminarInfo?.title || ''
+      success: true, 
+      message: existingAttendance ? 'Attendance updated successfully' : 'Attendance recorded successfully',
+      attendance: attendance,
+      seminarTitle: session.seminars[0]?.title,
+      materialsUrl: session.external_url 
     });
 
   } catch (error) {

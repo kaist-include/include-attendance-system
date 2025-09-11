@@ -21,8 +21,19 @@ export async function GET(
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select(`
-        *,
+        id,
+        seminar_id,
+        title,
+        description,
+        date,
+        duration_minutes,
+        location,
+        external_url,
+        status,
+        created_at,
+        updated_at,
         seminars!inner (
+          id,
           owner_id,
           title
         )
@@ -42,7 +53,7 @@ export async function GET(
       .eq('id', user.id)
       .single();
 
-    const isOwner = session.seminars.owner_id === user.id;
+    const isOwner = session.seminars[0]?.owner_id === user.id;
     const isAdmin = userRecord?.role === 'admin';
 
     if (!isOwner && !isAdmin) {
@@ -155,7 +166,7 @@ export async function POST(
       .eq('id', user.id)
       .single();
 
-    const isOwner = session.seminars.owner_id === user.id;
+    const isOwner = session.seminars[0]?.owner_id === user.id;
     const isAdmin = userRecord?.role === 'admin';
 
     if (!isOwner && !isAdmin) {
