@@ -193,7 +193,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
                 {/* User Avatar */}
                 <Link
-                  href={ROUTES.profile}
+                  href={ROUTES.settings}
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-accent"
                 >
                   <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">

@@ -149,7 +149,6 @@ export const ROUTES = {
   editSeminar: (id: string) => `/seminars/${id}/edit`,
   applySeminar: (id: string) => `/seminars/${id}/apply`,
   admin: '/admin',
-  profile: '/profile',
   settings: '/settings',
 } as const;
 
