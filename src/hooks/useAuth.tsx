@@ -139,6 +139,8 @@ export const useAuthProvider = (): AuthContextType => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
+        console.log(`Initial auth check: ${session?.user ? session.user.email : 'No session'}`);
+        
         if (mounted) {
           if (session?.user) {
             setUser(session.user);
@@ -147,6 +149,7 @@ export const useAuthProvider = (): AuthContextType => {
           setLoading(false);
         }
       } catch (err) {
+        console.error('Auth initialization error:', err);
         if (mounted) {
           setError(getErrorMessage(err));
           setLoading(false);
@@ -160,6 +163,8 @@ export const useAuthProvider = (): AuthContextType => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
+
+        console.log(`Auth state change: ${event}, User: ${session?.user ? session.user.email : 'None'}`);
 
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
@@ -244,14 +249,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 // Protected route hook
 export const useRequireAuth = (redirectTo = '/login') => {
   const { user, loading } = useAuth();
+  const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      window.location.href = redirectTo;
+    if (!loading) {
+      // Add a small delay to allow for session sync after login
+      const checkAuth = setTimeout(() => {
+        setHasChecked(true);
+        // Temporarily disable client-side redirect to debug
+        // Let middleware handle all redirects for now
+        if (!user) {
+          console.log('useRequireAuth: No user found, but letting middleware handle redirect');
+          // window.location.href = redirectTo;
+        } else {
+          console.log('useRequireAuth: User found:', user.email);
+        }
+      }, 200); // Increased delay to 200ms
+
+      return () => clearTimeout(checkAuth);
     }
   }, [user, loading, redirectTo]);
 
-  return { user, loading };
+  // Don't render content until we've checked auth status
+  const isReady = !loading && (user || hasChecked);
+  
+  return { user, loading: !isReady };
 };
 
 // Role-based access hook

@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
         tags: ['test', 'programming'],
         status: 'active',
         max_participants: 20,
-        application_type: 'open',
         created_at: new Date().toISOString(),
       })
       .select()

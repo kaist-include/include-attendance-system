@@ -5,10 +5,16 @@ import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoadingSpinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Image from 'next/image';
+import { Calendar, Clock, MapPin, Lightbulb, BookOpen, Users, CheckCircle, XCircle, Smartphone } from 'lucide-react';
 // Manager interfaces (existing)
 interface AttendanceSession {
   id: string;
@@ -114,6 +120,7 @@ export default function SeminarAttendancePage() {
   const [numericInput, setNumericInput] = useState('');
   const [scanningQr, setScanningQr] = useState(false);
   const [scanMessage, setScanMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | null>(null);
   
   // Manager numeric code visibility state
   const [showNumericCode, setShowNumericCode] = useState(false);
@@ -386,7 +393,8 @@ export default function SeminarAttendancePage() {
       const result = await response.json();
 
       if (response.ok) {
-        setScanMessage('✅ 출석이 성공적으로 처리되었습니다!');
+        setScanMessage('출석이 성공적으로 처리되었습니다!');
+        setMessageType('success');
         setQrInput('');
         setNumericInput('');
         // Refresh member data to show updated attendance
@@ -394,18 +402,22 @@ export default function SeminarAttendancePage() {
           window.location.reload();
         }, 1500);
       } else {
-        setScanMessage(`❌ ${result.error || '출석 처리 중 오류가 발생했습니다.'}`);
+        setScanMessage(result.error || '출석 처리 중 오류가 발생했습니다.');
+        setMessageType('error');
         // Clear error message after 5 seconds
         setTimeout(() => {
           setScanMessage('');
+          setMessageType(null);
         }, 5000);
       }
     } catch (err) {
-      setScanMessage(`❌ ${err instanceof Error ? err.message : '출석 처리 중 오류가 발생했습니다.'}`);
+      setScanMessage(err instanceof Error ? err.message : '출석 처리 중 오류가 발생했습니다.');
+      setMessageType('error');
       console.error('Error scanning QR:', err);
       // Clear error message after 5 seconds
       setTimeout(() => {
         setScanMessage('');
+        setMessageType(null);
       }, 5000);
     } finally {
       setScanningQr(false);
@@ -481,8 +493,7 @@ export default function SeminarAttendancePage() {
       <MainLayout>
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">출석 정보를 불러오는 중...</p>
+                    <LoadingSpinner />
           </div>
         </div>
       </MainLayout>
@@ -553,6 +564,10 @@ export default function SeminarAttendancePage() {
                 <div>
                   <div className="text-sm text-muted-foreground">출석률</div>
                   <div className="text-2xl font-bold text-foreground">{memberData?.statistics?.attendanceRate || 0}%</div>
+                  <Progress 
+                    value={memberData?.statistics?.attendanceRate || 0} 
+                    className="mt-2 h-2 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -561,7 +576,10 @@ export default function SeminarAttendancePage() {
           {/* Member QR Scan */}
           <Card>
             <CardHeader>
-              <CardTitle>📱 출석하기</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5" />
+                출석하기
+              </CardTitle>
               <CardDescription>스마트폰으로 QR 코드를 스캔하거나 6자리 숫자 코드를 입력하세요</CardDescription>
             </CardHeader>
             <CardContent>
@@ -569,7 +587,7 @@ export default function SeminarAttendancePage() {
                 {/* QR Scan Instructions */}
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <div className="text-center space-y-2">
-                    <div className="text-2xl">📱</div>
+                    <Smartphone className="w-8 h-8 mx-auto text-blue-600 dark:text-blue-400" />
                     <h3 className="font-medium text-blue-900 dark:text-blue-100">스마트폰으로 QR 스캔</h3>
                     <p className="text-sm text-blue-700 dark:text-blue-300">
                       관리자 화면의 QR 코드를 스캔하면<br/>
@@ -604,17 +622,23 @@ export default function SeminarAttendancePage() {
                 </div>
 
                 {scanMessage && (
-                  <div className={`p-4 rounded-lg text-sm text-center ${
-                    scanMessage.includes('✅') 
+                  <div className={`p-4 rounded-lg text-sm text-center flex items-center justify-center gap-2 ${
+                    messageType === 'success'
                       ? 'bg-green-50 text-green-800 border border-green-200' 
                       : 'bg-red-50 text-red-800 border border-red-200'
                   }`}>
-                    {scanMessage}
+                    {messageType === 'success' ? (
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    <span>{scanMessage}</span>
                   </div>
                 )}
                 
                 <div className="text-xs text-muted-foreground text-center">
-                  💡 QR 스캔이 더 빠르고 편리합니다!
+                  <Lightbulb className="w-3 h-3 inline mr-1" />
+                QR 스캔이 더 빠르고 편리합니다!
                 </div>
               </div>
             </CardContent>
@@ -630,7 +654,7 @@ export default function SeminarAttendancePage() {
               <div className="space-y-4">
                 {!memberData?.sessions || memberData.sessions.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <span className="block text-6xl mb-4 opacity-30">📚</span>
+                    <BookOpen className="mx-auto mb-4 w-16 h-16 opacity-30" />
                     <p>등록된 세션이 없습니다</p>
                   </div>
                 ) : (
@@ -657,9 +681,20 @@ export default function SeminarAttendancePage() {
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">{session.description}</p>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>📅 {new Date(session.date).toLocaleString()}</span>
-                            <span>⏱️ {session.durationMinutes}분</span>
-                            {session.location && <span>📍 {session.location}</span>}
+                                            <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {new Date(session.date).toLocaleString()}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {session.durationMinutes}분
+                </span>
+                {session.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {session.location}
+                  </span>
+                )}
                           </div>
                           {session.attendance.checkedAt && (
                             <div className="text-xs text-muted-foreground mt-2">
@@ -708,30 +743,32 @@ export default function SeminarAttendancePage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="text-sm font-medium text-foreground">회차 선택</label>
-                <select
-                  value={selectedSessionId}
-                  onChange={e => setSelectedSessionId(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                >
+                <Label>회차 선택</Label>
+                <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="세션을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {attendanceData?.sessions?.map(s => (
-                      <option key={s.id} value={s.id}>
+                      <SelectItem key={s.id} value={s.id}>
                         {s.sessionNumber}회차 · {s.title} · {new Date(s.date).toLocaleDateString()}
-                      </option>
+                      </SelectItem>
                     )) || (
-                      <option key="loading" value="">세션 로딩 중...</option>
+                      <SelectItem key="loading" value="" disabled>세션 로딩 중...</SelectItem>
                     )}
-                </select>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="md:col-span-2 flex flex-col items-center justify-center">
                   {error && error.includes('QR') ? (
                     <>
-                      <div className="w-64 h-64 flex flex-col items-center justify-center border-2 border-dashed border-red-300 rounded bg-red-50 dark:bg-red-900/20">
-                        <span className="text-red-600 dark:text-red-400 text-center text-sm px-4">
-                          {error}
-                        </span>
+                      <div className="w-64 h-64 flex flex-col items-center justify-center space-y-4">
+                        <Alert variant="destructive" className="w-full">
+                          <AlertDescription className="text-center text-sm">
+                            {error}
+                          </AlertDescription>
+                        </Alert>
                         <Button 
-                          className="mt-4" 
                           variant="outline" 
                           size="sm"
                           onClick={generateQr}
@@ -774,15 +811,17 @@ export default function SeminarAttendancePage() {
                                 {numericCode}
                               </p>
                             ) : (
-                              <div 
-                                className="text-3xl font-mono font-bold text-muted-foreground tracking-wider cursor-pointer select-none"
+                              <Button
+                                variant="ghost"
                                 onClick={() => setShowNumericCode(true)}
+                                className="text-3xl font-mono font-bold text-muted-foreground tracking-wider h-auto p-2"
                               >
                                 ••••••
-                              </div>
+                              </Button>
                             )}
                             <p className="text-xs text-muted-foreground mt-2 opacity-70">
-                              💡 QR 스캔을 권장합니다. 숫자 코드는 필요시에만 사용하세요.
+                              <Lightbulb className="w-3 h-3 inline mr-1" />
+                QR 스캔을 권장합니다. 숫자 코드는 필요시에만 사용하세요.
                             </p>
                           </div>
                         )}
@@ -798,8 +837,8 @@ export default function SeminarAttendancePage() {
                     </>
                   ) : (
                     <>
-                      <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted-foreground rounded">
-                        <span className="text-muted-foreground">
+                      <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-muted rounded-lg bg-muted/30">
+                        <span className="text-muted-foreground text-center text-sm">
                           {generatingQr ? 'QR 코드 생성 중...' : 'QR 코드를 생성하세요'}
                         </span>
                       </div>
@@ -858,7 +897,7 @@ export default function SeminarAttendancePage() {
               <div className="space-y-3">
                 {!attendees || attendees.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <span className="block text-6xl mb-4 opacity-30">👥</span>
+                    <Users className="mx-auto mb-4 w-16 h-16 opacity-30" />
                     <p>등록된 학생이 없습니다</p>
                   </div>
                 ) : (

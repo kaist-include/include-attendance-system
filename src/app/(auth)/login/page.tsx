@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { IncludeLogo } from '@/components/ui/logo';
 import { ROUTES } from '@/config/constants';
@@ -33,16 +35,14 @@ export default function LoginPage() {
           <CardContent>
             <form action={login} className="space-y-6">
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">
-                  이메일
-                </label>
+                <Label htmlFor="email">이메일</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                  <Input
                     id="email"
                     name="email"
                     type="email"
-                    className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
+                    className="pl-10"
                     placeholder="이메일을 입력하세요"
                     required
                   />
@@ -50,16 +50,14 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-foreground">
-                  비밀번호
-                </label>
+                <Label htmlFor="password">비밀번호</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                  <Input
                     id="password"
                     name="password"
                     type="password"
-                    className="pl-10 w-full px-4 py-3 border border-input bg-background rounded-lg focus:ring-2 focus:ring-ring focus:border-ring outline-none transition-colors placeholder:text-muted-foreground"
+                    className="pl-10"
                     placeholder="비밀번호를 입력하세요"
                     required
                   />

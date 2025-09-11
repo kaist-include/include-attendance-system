@@ -5,8 +5,12 @@ import { useAuth, useRequireAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { LoadingSpinner } from '@/components/ui/spinner';
+import { Progress } from '@/components/ui/progress';
 import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { DashboardStats, DashboardAnnouncement } from '@/types';
 
 interface UpcomingSession {
   id: string;
@@ -25,11 +29,99 @@ export default function DashboardPage() {
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [weekRangeLabel, setWeekRangeLabel] = useState<string>("");
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<DashboardAnnouncement[]>([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
 
   useEffect(() => {
     const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     setWeekRangeLabel(end.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }));
   }, []);
+
+  // Fetch dashboard statistics
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchStats = async () => {
+      if (!user?.id || cancelled) {
+        if (!cancelled) setStatsLoading(false);
+        return;
+      }
+
+      try {
+        setStatsLoading(true);
+        const response = await fetch('/api/dashboard/stats');
+        
+        if (cancelled) return;
+
+        if (response.ok) {
+          const data = await response.json();
+          if (!cancelled) {
+            setStats(data);
+          }
+        } else {
+          console.error('Failed to fetch dashboard stats:', response.status);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error fetching dashboard stats:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setStatsLoading(false);
+        }
+      }
+    };
+
+    fetchStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Fetch announcements
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAnnouncements = async () => {
+      if (!user?.id || cancelled) {
+        if (!cancelled) setAnnouncementsLoading(false);
+        return;
+      }
+
+      try {
+        setAnnouncementsLoading(true);
+        const response = await fetch('/api/dashboard/announcements');
+        
+        if (cancelled) return;
+
+        if (response.ok) {
+          const data = await response.json();
+          if (!cancelled) {
+            setAnnouncements(data);
+          }
+        } else {
+          console.error('Failed to fetch announcements:', response.status);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error fetching announcements:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setAnnouncementsLoading(false);
+        }
+      }
+    };
+
+    fetchAnnouncements();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
 
 
@@ -92,24 +184,24 @@ export default function DashboardPage() {
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  // 임시 데이터 (실제로는 API에서 가져올 데이터) - TODO: 실제 통계 API 구현
-  const stats = [
+  // 통계 카드 데이터 구성
+  const statsCards = [
     {
       title: '참여 중인 세미나',
-      value: '0', // TODO: 실제 데이터로 교체
-      description: '이번 학기',
+      value: statsLoading ? '-' : (stats?.currentSeminars?.toString() || '0'),
+      description: stats?.currentSemester ? `${stats.currentSemester} 학기` : '이번 학기',
       icon: BookOpen,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
       title: '평균 출석률',
-      value: '-%', // TODO: 실제 데이터로 교체
+      value: statsLoading ? '-%' : `${stats?.attendanceRate || 0}%`,
       description: '지난 4주',
       icon: TrendingUp,
       color: 'text-green-600',
@@ -117,7 +209,7 @@ export default function DashboardPage() {
     },
     {
       title: '다음 세션',
-      value: upcomingSessions.length.toString(),
+      value: sessionsLoading ? '-' : upcomingSessions.length.toString(),
       description: '이번 주',
       icon: Clock,
       color: 'text-orange-600',
@@ -125,7 +217,7 @@ export default function DashboardPage() {
     },
     {
       title: '완료한 세미나',
-      value: '0', // TODO: 실제 데이터로 교체
+      value: statsLoading ? '-' : (stats?.completedSeminars?.toString() || '0'),
       description: '전체 기간',
       icon: Award,
       color: 'text-purple-600',
@@ -133,22 +225,7 @@ export default function DashboardPage() {
     },
   ];
 
-  const recentAnnouncements = [
-    {
-      id: 1,
-      title: '[공지] 2월 정기 세미나 일정 변경',
-      content: '2월 둘째 주 세미나가 2월 15일로 변경되었습니다.',
-      time: '2시간 전',
-      isNew: true,
-    },
-    {
-      id: 2,
-      title: 'React 세미나 과제 제출 안내',
-      content: '5회차 세미나 과제를 2월 5일까지 제출해주세요.',
-      time: '5시간 전',
-      isNew: false,
-    },
-  ];
+
 
   return (
     <MainLayout>
@@ -164,7 +241,7 @@ export default function DashboardPage() {
 
         {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => {
+          {statsCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
               <Card key={index} className="hover:shadow-lg transition-shadow">
@@ -177,8 +254,21 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{stat.value}</div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {(statsLoading || sessionsLoading) ? (
+                      <Loader2 className="w-6 h-6 animate-spin inline" />
+                    ) : (
+                      stat.value
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                  {/* Add Progress bar for attendance rate */}
+                  {index === 1 && !statsLoading && (
+                    <Progress 
+                      value={stats?.attendanceRate || 0} 
+                      className="mt-3 h-2 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
+                    />
+                  )}
                 </CardContent>
               </Card>
             );
@@ -252,33 +342,66 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentAnnouncements.map((announcement) => (
-                <div
-                  key={announcement.id}
-                  className="border border-border rounded-lg p-4 hover:bg-accent transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h3 className="font-medium text-foreground">{announcement.title}</h3>
-                        {announcement.isNew && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-foreground">
-                            NEW
-                          </span>
-                        )}
+              {announcementsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+                  <span className="ml-2 text-muted-foreground">공지사항을 불러오는 중...</span>
+                </div>
+              ) : (
+                <>
+                  {announcements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className="border border-border rounded-lg p-4 hover:bg-accent transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 flex-wrap">
+                            <h3 className="font-medium text-foreground">{announcement.title}</h3>
+                            {announcement.isPinned && (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-200">
+                                고정
+                              </Badge>
+                            )}
+                            {announcement.isNew && (
+                              <Badge variant="secondary">
+                                NEW
+                              </Badge>
+                            )}
+                            {announcement.isGlobal && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200">
+                                전체 공지
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
+                          <div className="flex items-center space-x-2 mt-2 text-xs text-muted-foreground">
+                            <span>{announcement.time}</span>
+                            {announcement.seminarTitle && (
+                              <>
+                                <span>•</span>
+                                <span>{announcement.seminarTitle}</span>
+                              </>
+                            )}
+                            {announcement.authorName && (
+                              <>
+                                <span>•</span>
+                                <span>{announcement.authorName}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
-                      <p className="text-xs text-muted-foreground mt-2">{announcement.time}</p>
                     </div>
-                  </div>
-                </div>
-              ))}
-              
-              {recentAnnouncements.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Bell className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p>새로운 공지사항이 없습니다</p>
-                </div>
+                  ))}
+                  
+                  {announcements.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Bell className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>새로운 공지사항이 없습니다</p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

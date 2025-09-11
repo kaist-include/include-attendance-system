@@ -68,7 +68,6 @@ export async function GET(
       .from('sessions')
       .select(`
         id,
-        session_number,
         title,
         description,
         date,
@@ -77,7 +76,7 @@ export async function GET(
         status
       `)
       .eq('seminar_id', seminarId)
-      .order('session_number', { ascending: true });
+      .order('date', { ascending: true });
 
     if (sessionsError) {
       console.error('❌ Error fetching sessions:', sessionsError);
@@ -114,12 +113,12 @@ export async function GET(
     console.log('✅ My attendance records found:', myAttendances.length);
 
     // Combine session data with attendance status
-    const sessionsWithAttendance = sessions?.map(session => {
+    const sessionsWithAttendance = sessions?.map((session, index) => {
       const attendance = myAttendances.find(a => a.session_id === session.id);
       
       return {
         id: session.id,
-        sessionNumber: session.session_number,
+        sessionNumber: index + 1,
         title: session.title,
         description: session.description,
         date: session.date,

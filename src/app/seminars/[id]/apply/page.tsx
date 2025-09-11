@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useRequireAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/config/constants';
 
@@ -65,16 +68,20 @@ export default function SeminarApplyPage() {
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={submit}>
-              <div>
-                <label className="text-sm font-medium text-foreground">이메일</label>
-                <input value={user?.email || ''} readOnly className="mt-1 w-full px-3 py-2 rounded-lg border border-input bg-muted text-foreground/80" />
+              <div className="space-y-2">
+                <Label>이메일</Label>
+                <Input 
+                  value={user?.email || ''} 
+                  readOnly 
+                  className="bg-muted text-foreground/80" 
+                />
               </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">신청 메모 (선택)</label>
-                <textarea
+              <div className="space-y-2">
+                <Label>신청 메모 (선택)</Label>
+                <Textarea
                   value={memo}
                   onChange={e => setMemo(e.target.value)}
-                  className="mt-1 w-full min-h-24 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="min-h-24"
                   placeholder="세미나 개설자에게 전달할 메시지나 간단한 자기소개를 적어주세요"
                 />
               </div>

@@ -98,7 +98,7 @@ export async function GET(
     return NextResponse.json({
       session: {
         id: session.id,
-        sessionNumber: session.session_number,
+        sessionNumber: 1, // Will be calculated dynamically on frontend
         title: session.title,
         description: session.description,
         date: session.date,
