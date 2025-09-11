@@ -6,7 +6,11 @@ async function forceUpdateSeminarDates() {
     console.log('🚀 Starting force update of seminar dates...\n');
 
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const apiUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const apiUrl = process.env.NEXT_PUBLIC_APP_URL;
+    
+    if (!apiUrl) {
+      throw new Error('NEXT_PUBLIC_APP_URL not found in environment variables. Please set it to your production URL.');
+    }
     
     if (!supabaseServiceKey) {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY not found in environment variables');

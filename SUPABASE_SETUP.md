@@ -57,58 +57,43 @@ This will create:
 2. Configure the following:
 
 ### Site URL
-- Set to `http://localhost:3000` for development
-- Update to your production URL when deploying
+- **Development**: Set to `http://localhost:3000`
+- **Production**: Set to your actual website URL (e.g., `https://yourdomain.com`)
 
-### Email Templates (Optional)
-- Customize confirmation and password reset emails
-- Go to **Authentication** → **Email Templates**
+**IMPORTANT**: If you're experiencing login redirects to localhost:3000 on your production site, you need to update the Site URL in your Supabase dashboard to match your actual domain.
 
-### Providers (Optional)
-- Enable additional auth providers if needed
-- Go to **Authentication** → **Providers**
+### Additional URLs
+- Add any additional redirect URLs if needed for different environments
 
-## Step 6: Test the Connection
+## Step 6: Environment Variables for Production
 
-1. Start your development server:
+When deploying to production, make sure to set the following environment variable:
+
 ```bash
-npm run dev
+# Production URL (replace with your actual domain)
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
 ```
 
-2. Visit `http://localhost:3000`
-3. Try to register a new user
-4. Check the Supabase dashboard **Authentication** → **Users** to see if the user was created
-5. Check the **Table Editor** to see if the user profile was automatically created
-
-## Step 7: Verify Database Connection
-
-After successful user registration, verify in Supabase:
-
-1. Go to **Table Editor**
-2. Check the `users` table - should have your new user
-3. Check the `profiles` table - should have the user's profile
-4. Test creating a semester from your admin panel
-5. Test creating a seminar
-
-## Security Features Included
-
-### Row Level Security (RLS)
-- Users can only see their own data
-- Seminar owners can manage their seminars
-- Admins have elevated permissions
-
-### Automatic User Profile Creation
-- When a user registers via Supabase Auth, a trigger automatically:
-  - Creates an entry in the `users` table
-  - Creates a profile in the `profiles` table
-  - Sets default role as 'member'
-
-### Data Validation
-- Database constraints ensure data integrity
-- Enum types provide consistent status values
-- Foreign key relationships maintain referential integrity
+This ensures that QR codes and other generated URLs point to your production domain instead of localhost.
 
 ## Troubleshooting
+
+### Login Redirects to localhost:3000
+
+If you're experiencing login redirects to localhost:3000 instead of your actual website:
+
+1. **Check Supabase Site URL**: 
+   - Go to your Supabase dashboard → Authentication → Settings
+   - Ensure the "Site URL" is set to your production domain (e.g., `https://yourdomain.com`)
+   - NOT `http://localhost:3000`
+
+2. **Set Environment Variable**:
+   - Add `NEXT_PUBLIC_APP_URL=https://yourdomain.com` to your environment variables
+   - This fixes QR code generation and other URL-dependent features
+
+3. **Redeploy Your Application**:
+   - After updating the Supabase Site URL and environment variables
+   - Redeploy your application to apply the changes
 
 ### Common Issues:
 

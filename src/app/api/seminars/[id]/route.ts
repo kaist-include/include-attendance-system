@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sendSeminarUpdatedNotification, sendSeminarDeletedNotification } from '@/lib/notifications';
 
 export async function GET(
   request: NextRequest,
@@ -47,7 +48,7 @@ export async function GET(
           location,
   
           status,
-          materials_url
+          external_url
         )
       `)
       .eq('id', seminarId)
@@ -138,10 +139,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid authorization' }, { status: 401 });
     }
 
-    // Check if user can edit this seminar
+    // Check if user can edit this seminar and get original data for comparison
     const { data: seminar, error: seminarError } = await supabase
       .from('seminars')
-      .select('owner_id')
+      .select('owner_id, title, description, location, start_date, end_date')
       .eq('id', id)
       .single();
 
@@ -175,6 +176,9 @@ export async function PUT(
     if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
     if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
     if (updates.location !== undefined) updateData.location = updates.location;
+    if (updates.external_url !== undefined || updates.externalUrl !== undefined) {
+      updateData.external_url = updates.external_url || updates.externalUrl || null;
+    }
     if (updates.tags !== undefined) updateData.tags = updates.tags;
     if (updates.applicationStart !== undefined) updateData.application_start = updates.applicationStart;
     if (updates.applicationEnd !== undefined) updateData.application_end = updates.applicationEnd;
@@ -206,6 +210,37 @@ export async function PUT(
     if (updateError) {
       console.error('Error updating seminar:', updateError);
       return NextResponse.json({ error: 'Failed to update seminar' }, { status: 500 });
+    }
+
+    // Send notification about seminar update to enrolled users
+    try {
+      const changes = [];
+      if (updateData.title && updateData.title !== seminar.title) {
+        changes.push(`제목: ${seminar.title} → ${updateData.title}`);
+      }
+      if (updateData.description && updateData.description !== seminar.description) {
+        changes.push('세미나 설명이 변경됨');
+      }
+      if (updateData.location && updateData.location !== seminar.location) {
+        changes.push(`장소: ${seminar.location || '미정'} → ${updateData.location}`);
+      }
+      if (updateData.start_date && updateData.start_date !== seminar.start_date) {
+        changes.push(`시작일: ${seminar.start_date} → ${updateData.start_date}`);
+      }
+      if (updateData.end_date && updateData.end_date !== seminar.end_date) {
+        changes.push(`종료일: ${seminar.end_date || '미정'} → ${updateData.end_date || '미정'}`);
+      }
+
+      if (changes.length > 0) {
+        await sendSeminarUpdatedNotification(
+          id,
+          updatedSeminar.title,
+          changes.join(', ')
+        );
+      }
+    } catch (notificationError) {
+      console.error('Failed to send seminar update notification:', notificationError);
+      // Don't fail the update if notification fails
     }
 
     return NextResponse.json(updatedSeminar);
@@ -472,6 +507,26 @@ export async function DELETE(
     }
 
         console.log('✅ Seminar deleted successfully:', seminar.title);
+
+    // Send notification to enrolled users about seminar deletion
+    try {
+      if (existingEnrollments && existingEnrollments.length > 0) {
+        const enrolledUserIds = existingEnrollments
+          .filter(e => e.status === 'approved')
+          .map(e => e.user_id);
+        
+        if (enrolledUserIds.length > 0) {
+          await sendSeminarDeletedNotification(
+            seminar.id,
+            seminar.title,
+            enrolledUserIds
+          );
+        }
+      }
+    } catch (notificationError) {
+      console.error('Failed to send seminar deletion notification:', notificationError);
+      // Don't fail the deletion if notification fails
+    }
 
     return NextResponse.json({
       message: 'Seminar deleted successfully',

@@ -74,6 +74,7 @@ interface SeminarData {
   startDate: string;
   endDate: string | null;
   location: string | null;
+  external_url: string | null;
   tags: string[];
   status: string;
   applicationStart: string;
@@ -127,7 +128,8 @@ export default function SeminarDetailPage() {
     date: string;
     duration_minutes: number;
     location: string;
-  }>({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+    external_url: string;
+  }>({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '', external_url: '' });
 
   const [newTag, setNewTag] = useState('');
   const [addingSession, setAddingSession] = useState(false);
@@ -143,7 +145,8 @@ export default function SeminarDetailPage() {
     date: string;
     duration_minutes: number;
     location: string;
-  }>({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+    external_url?: string;
+  }>({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '', external_url: '' });
   const [updatingSession, setUpdatingSession] = useState(false);
 
   // Status management states
@@ -350,6 +353,7 @@ export default function SeminarDetailPage() {
       date: session.date, // Use stored date directly
       duration_minutes: session.duration_minutes,
       location: session.location || '',
+      external_url: session.external_url || '',
     });
     setEditDialogOpen(true);
   };
@@ -372,6 +376,7 @@ export default function SeminarDetailPage() {
           date: editSessionData.date,
           duration_minutes: editSessionData.duration_minutes,
           location: editSessionData.location,
+          external_url: editSessionData.external_url,
         }),
       });
 
@@ -388,7 +393,7 @@ export default function SeminarDetailPage() {
       
       // Reset form and close modal - no success message needed
       setEditingSession(null);
-      setEditSessionData({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+      setEditSessionData({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '', external_url: '' });
       setEditDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update session');
@@ -419,6 +424,7 @@ export default function SeminarDetailPage() {
       date: newSession.date,
           duration_minutes: newSession.duration_minutes,
           location: newSession.location || null,
+          external_url: newSession.external_url || null,
         }),
       });
 
@@ -435,7 +441,7 @@ export default function SeminarDetailPage() {
       } : null);
 
       // Reset form
-      setNewSession({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '' });
+      setNewSession({ title: '', description: '', date: '', duration_minutes: DEFAULTS.sessionDuration, location: '', external_url: '' });
 
       // Refresh seminar data to get updated start/end dates
       await refreshSeminarData();
@@ -727,12 +733,7 @@ export default function SeminarDetailPage() {
                 내 출석 현황
               </Button>
             )}
-            {!user ? (
-              <Button onClick={handleEnroll}>
-                <UserPlus className="w-4 h-4 mr-2" />
-                신청하기
-              </Button>
-            ) : seminarData.currentUserEnrollment ? (
+            {seminarData.currentUserEnrollment ? (
               // 이미 신청한 사용자 - 모든 신청은 승인 대기
               seminarData.currentUserEnrollment.status === 'pending' ? (
                 <Button variant="secondary" disabled>
@@ -782,7 +783,7 @@ export default function SeminarDetailPage() {
                   <CardTitle className="text-lg">세미나 설명</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 {isEditing && editData ? (
                   <Textarea
                     value={editData.description}
@@ -795,8 +796,74 @@ export default function SeminarDetailPage() {
                     <p className="text-foreground leading-relaxed whitespace-pre-wrap">
                       {seminarData.description || '설명이 아직 작성되지 않았습니다.'}
                     </p>
+                    {seminarData.external_url && (
+                      <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-2">참고 링크:</p>
+                        <a 
+                          href={seminarData.external_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline break-all"
+                        >
+                          {seminarData.external_url}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                {/* Category Tags Section */}
+                <div className="border-t pt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Tag className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-medium text-foreground">카테고리 태그</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(isEditing && editData ? editData.tags : seminarData.tags).map(tag => (
+                      <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+                        <Tag className="w-3 h-3" />
+                        {tag}
+                        {canManage && isEditing && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ml-1 h-4 w-4 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleRemoveTag(tag)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                  {canManage && isEditing && (
+                    <>
+                      <div className="mt-3 flex gap-2">
+                        <Input
+                          value={newTag}
+                          onChange={e => setNewTag(e.target.value)}
+                          placeholder="#태그 추가"
+                          className="flex-1"
+                        />
+                        <Button variant="outline" onClick={handleAddTag}>추가</Button>
+                      </div>
+                      <div className="mt-2 flex gap-2 flex-wrap">
+                        {categoryTags.map(ct => (
+                          <Button
+                            key={ct}
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => { setNewTag(ct); }}
+                          >
+                            #{ct}
+                          </Button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+
               </CardContent>
             </Card>
           </div>
@@ -1005,100 +1072,7 @@ export default function SeminarDetailPage() {
           </div>
         </div>
 
-        {/* Tags Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Tag className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg">카테고리 태그</CardTitle>
-            </div>
-            <CardDescription>세미나 주제와 관련된 키워드입니다</CardDescription>
-          </CardHeader>
-          <CardContent>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="space-y-4 lg:col-span-2">
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">카테고리 태그</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(isEditing && editData ? editData.tags : seminarData.tags).map(tag => (
-                      <Badge key={tag} variant="secondary" className="gap-1 pr-1">
-                        <Tag className="w-3 h-3" />
-                        {tag}
-                        {canManage && isEditing && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="ml-1 h-4 w-4 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleRemoveTag(tag)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-                  {canManage && isEditing && (
-                    <>
-                    <div className="mt-3 flex gap-2">
-                      <Input
-                        value={newTag}
-                        onChange={e => setNewTag(e.target.value)}
-                        placeholder="#태그 추가"
-                        className="flex-1"
-                      />
-                      <Button variant="outline" onClick={handleAddTag}>추가</Button>
-                    </div>
-                    <div className="mt-2 flex gap-2 flex-wrap">
-                      {categoryTags.map(ct => (
-                        <Button
-                          key={ct}
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => { setNewTag(ct); }}
-                        >
-                          #{ct}
-                        </Button>
-                      ))}
-                    </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-
-            </div>
-
-            {canManage && (
-              <div className="pt-2">
-                {!isEditing ? (
-                  <Button variant="outline" onClick={() => setIsEditing(true)}>정보 수정</Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button onClick={handleSave} disabled={saving}>
-                      {saving ? '저장 중...' : '저장'}
-                    </Button>
-                    <Button variant="outline" onClick={() => {
-                      setIsEditing(false);
-                      // Reset edit data
-                      setEditData({
-                        title: seminarData.title,
-                        description: seminarData.description,
-                        capacity: seminarData.capacity,
-                        location: seminarData.location || '',
-                        startDate: seminarData.startDate,
-                        endDate: seminarData.endDate || '',
-                        applicationStart: seminarData.applicationStart,
-                        applicationEnd: seminarData.applicationEnd,
-                        tags: [...seminarData.tags]
-                      });
-                    }}>취소</Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Sessions */}
         <Card>
@@ -1154,6 +1128,18 @@ export default function SeminarDetailPage() {
                           </span>
                         )}
                       </div>
+                      {s.external_url && (
+                        <div className="mt-2">
+                          <a 
+                            href={s.external_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline break-all"
+                          >
+                            📎 참고 링크
+                          </a>
+                        </div>
+                      )}
                     </div>
                     {canManage && (
                       <div className="flex gap-2">
@@ -1253,6 +1239,17 @@ export default function SeminarDetailPage() {
                                   value={editSessionData.description}
                                   onChange={e => setEditSessionData(v => ({ ...v, description: e.target.value }))}
                                   rows={3}
+                                />
+                              </div>
+
+                              {/* 네 번째 행: 참고 링크 */}
+                              <div className="space-y-2">
+                                <Label>참고 링크 (선택사항)</Label>
+                                <Input
+                                  type="url"
+                                  placeholder="https://example.com"
+                                  value={editSessionData.external_url || ''}
+                                  onChange={e => setEditSessionData(v => ({ ...v, external_url: e.target.value }))}
                                 />
                               </div>
 
@@ -1392,6 +1389,18 @@ export default function SeminarDetailPage() {
                           rows={3}
                     />
                   </div>
+
+                      {/* 네 번째 행: 참고 링크 */}
+                      <div className="space-y-2">
+                        <Label htmlFor="session-external-url">참고 링크 (선택사항)</Label>
+                        <Input
+                          id="session-external-url"
+                          type="url"
+                          placeholder="https://example.com"
+                          value={newSession.external_url}
+                          onChange={e => setNewSession(v => ({ ...v, external_url: e.target.value }))}
+                        />
+                      </div>
 
                       {/* 추가 버튼 */}
                       <div className="flex justify-end pt-2">

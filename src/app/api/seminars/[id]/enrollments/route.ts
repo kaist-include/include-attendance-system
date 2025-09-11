@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sendEnrollmentApprovedNotification, sendEnrollmentRejectedNotification } from '@/lib/notifications';
 
 export async function GET(
   request: NextRequest,
@@ -157,11 +158,21 @@ export async function PUT(
       return NextResponse.json({ error: 'Enrollment not found' }, { status: 404 });
     }
 
-    // Prevent owners from approving/rejecting themselves (unless admin override)
-    if (enrollmentToUpdate.user_id === user.id && !isAdmin) {
-      return NextResponse.json({ 
-        error: '세미나 개설자는 자신의 신청을 승인/거절할 수 없습니다.' 
-      }, { status: 403 });
+    // Prevent self-approval/rejection with specific rules:
+    // 1. Seminar owners cannot approve/reject their own applications (logically inconsistent)
+    // 2. Admins can approve/reject their own applications to others' seminars (admin privilege)
+    // 3. Regular users cannot approve/reject any applications (no permission)
+    if (enrollmentToUpdate.user_id === user.id) {
+      if (isOwner) {
+        return NextResponse.json({ 
+          error: '세미나 개설자는 자신의 세미나에 신청할 수 없습니다.' 
+        }, { status: 403 });
+      } else if (!isAdmin) {
+        return NextResponse.json({ 
+          error: '자신의 신청을 직접 승인/거절할 수 없습니다.' 
+        }, { status: 403 });
+      }
+      // Admin processing their own application to someone else's seminar is allowed
     }
 
     if (!action || !enrollmentId) {
@@ -217,6 +228,28 @@ export async function PUT(
       }
 
       console.log(`✅ Enrollment ${action}d successfully:`, enrollment);
+
+      // Send notification to the user
+      try {
+        if (action === 'approve') {
+          await sendEnrollmentApprovedNotification(
+            enrollment.user_id,
+            seminar.title,
+            seminarId,
+            enrollmentId
+          );
+        } else if (action === 'reject') {
+          await sendEnrollmentRejectedNotification(
+            enrollment.user_id,
+            seminar.title,
+            seminarId,
+            enrollmentId
+          );
+        }
+      } catch (notificationError) {
+        console.error('Failed to send notification:', notificationError);
+        // Don't fail the enrollment update if notification fails
+      }
 
       return NextResponse.json({
         message: `Enrollment ${action}d successfully`,

@@ -65,29 +65,15 @@ export async function POST(
     const numericCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // Update session with QR code and numeric code (we could store this in a separate table for better management)
-    const { error: updateError } = await supabase
-      .from('sessions')
-      .update({ 
-        materials_url: JSON.stringify({
-          qr_code: qrCode,
-          numeric_code: numericCode,
-          expires_at: expiresAt.toISOString(),
-          created_by: user.id,
-          created_at: new Date().toISOString()
-        })
-      })
-      .eq('id', sessionId);
-
-    if (updateError) {
-      console.error('Error updating session with QR code:', updateError);
-      return NextResponse.json({ error: 'Failed to generate QR code' }, { status: 500 });
-    }
+    // TODO: Store QR codes in a separate table for better management
+    // For now, we'll return the QR code data without storing it persistently
+    console.log('✅ QR code generated for session:', sessionId);
 
     // Create scannable URL for QR code
     const host = request.headers.get('host') || 'localhost:3000';
     const protocol = host.includes('localhost') ? 'http' : 'https';
-    const baseUrl = `${protocol}://${host}`;
+    // Use environment variable for production URL or fallback to host header
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const qrUrl = `${baseUrl}/attendance/scan?token=${qrCode}&session=${sessionId}&seminar=${seminarId}`;
 
     return NextResponse.json({
@@ -130,38 +116,9 @@ export async function PUT(
     let sessionId, qrCode, expiresAt;
     
     if (numericCode) {
-      // Handle numeric code input
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('sessions')
-        .select('id, materials_url')
-        .eq('seminar_id', seminarId)
-        .not('materials_url', 'is', null);
-      
-      if (sessionError || !sessionData) {
-        return NextResponse.json({ error: 'Failed to find session' }, { status: 500 });
-      }
-
-      // Find session with matching numeric code
-      let matchingSession = null;
-      for (const session of sessionData) {
-        try {
-          const materials = JSON.parse(session.materials_url || '{}');
-          if (materials.numeric_code === numericCode) {
-            matchingSession = { ...session, materials };
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!matchingSession) {
-        return NextResponse.json({ error: 'Invalid numeric code' }, { status: 400 });
-      }
-
-      sessionId = matchingSession.id;
-      qrCode = matchingSession.materials.qr_code;
-      expiresAt = matchingSession.materials.expires_at;
+      // TODO: Implement proper QR code lookup from QR codes table
+      // For now, we'll disable numeric code verification
+      return NextResponse.json({ error: 'Numeric code verification not yet implemented' }, { status: 501 });
     } else {
       // Handle QR data input
       let parsedQrData;

@@ -16,7 +16,7 @@ import { LoadingSpinner } from '@/components/ui/spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { DEFAULTS, ROUTES, VALIDATION_RULES } from '@/config/constants';
 import { formatSemesterLabel } from '@/lib/utils';
-import { X, Tag, FileText } from 'lucide-react';
+import { X, Tag, FileText, Users, Plus, Trash2, Search, UserPlus } from 'lucide-react';
 
 interface SemesterOption {
   id: string;
@@ -52,10 +52,19 @@ export default function EditSeminarPage() {
     application_start: undefined as Date | undefined,
     application_end: undefined as Date | undefined,
     location: '',
+    external_url: '',
 
     tags: [] as string[],
     tagInput: '',
   });
+
+  // Role management state
+  const [permissions, setPermissions] = useState<any[]>([]);
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showUserSearch, setShowUserSearch] = useState(false);
 
   // Fetch available semesters from database
   useEffect(() => {
@@ -109,6 +118,7 @@ export default function EditSeminarPage() {
           application_start: data.applicationStart ? new Date(data.applicationStart) : undefined,
           application_end: data.applicationEnd ? new Date(data.applicationEnd) : undefined,
           location: data.location || '',
+          external_url: data.external_url || '',
           tags: data.tags || [],
           tagInput: '',
         });
@@ -137,6 +147,91 @@ export default function EditSeminarPage() {
   const removeTag = (t: string) => {
     setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }));
   };
+
+  // Role management functions
+  const fetchPermissions = async () => {
+    if (!id) return;
+    setLoadingPermissions(true);
+    try {
+      const response = await fetch(`/api/seminars/${id}/permissions`);
+      if (response.ok) {
+        const data = await response.json();
+        setPermissions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  const searchUsers = async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setSearchLoading(true);
+    try {
+      const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&seminarId=${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const addPermission = async (userId: string, role: string) => {
+    try {
+      const response = await fetch(`/api/seminars/${id}/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role })
+      });
+      
+      if (response.ok) {
+        await fetchPermissions(); // Refresh the list
+        setUserSearch('');
+        setSearchResults([]);
+        setShowUserSearch(false);
+      } else {
+        const error = await response.json();
+        setError(error.message || 'Failed to add permission');
+      }
+    } catch (error) {
+      console.error('Error adding permission:', error);
+      setError('Failed to add permission');
+    }
+  };
+
+  const removePermission = async (permissionId: string) => {
+    try {
+      const response = await fetch(`/api/seminars/${id}/permissions?permissionId=${permissionId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        await fetchPermissions(); // Refresh the list
+      } else {
+        const error = await response.json();
+        setError(error.message || 'Failed to remove permission');
+      }
+    } catch (error) {
+      console.error('Error removing permission:', error);
+      setError('Failed to remove permission');
+    }
+  };
+
+  // Load permissions when component mounts
+  useEffect(() => {
+    if (id && seminar) {
+      fetchPermissions();
+    }
+  }, [id, seminar]);
 
   const validateForm = () => {
     if (!form.title.trim()) {
@@ -207,6 +302,7 @@ export default function EditSeminarPage() {
           startDate: form.start_date ? form.start_date.toISOString().split('T')[0] : null,
           endDate: form.end_date ? form.end_date.toISOString().split('T')[0] : null,
           location: form.location || null,
+          external_url: form.external_url || null,
           applicationStart: form.application_start ? form.application_start.toISOString() : null,
           applicationEnd: form.application_end ? 
             form.application_end.toISOString() :
@@ -406,6 +502,17 @@ export default function EditSeminarPage() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="external_url">참고 링크 (선택사항)</Label>
+                <Input
+                  id="external_url"
+                  type="url"
+                  value={form.external_url}
+                  onChange={e => setForm(f => ({ ...f, external_url: e.target.value }))}
+                  placeholder="https://example.com"
+                />
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <Label>신청 방식</Label>
@@ -466,6 +573,146 @@ export default function EditSeminarPage() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Role Management Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              <CardTitle>세미나 권한 관리</CardTitle>
+            </div>
+            <CardDescription>
+              다른 사용자에게 세미나 관리 권한을 부여할 수 있습니다
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Add User Section */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium">사용자 추가</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowUserSearch(!showUserSearch)}
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  사용자 추가
+                </Button>
+              </div>
+
+              {showUserSearch && (
+                <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="이름 또는 이메일로 검색..."
+                      value={userSearch}
+                      onChange={(e) => {
+                        setUserSearch(e.target.value);
+                        searchUsers(e.target.value);
+                      }}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {searchLoading && (
+                    <div className="text-center py-2 text-sm text-muted-foreground">
+                      검색 중...
+                    </div>
+                  )}
+
+                  {searchResults.length > 0 && (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {searchResults.map((user) => (
+                        <div key={user.id} className="flex items-center justify-between p-2 border rounded-lg bg-background">
+                          <div>
+                            <div className="text-sm font-medium">{user.name}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addPermission(user.id, 'assistant')}
+                            >
+                              조교 추가
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addPermission(user.id, 'moderator')}
+                            >
+                              관리자 추가
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {userSearch.length >= 2 && !searchLoading && searchResults.length === 0 && (
+                    <div className="text-center py-2 text-sm text-muted-foreground">
+                      검색 결과가 없습니다
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Current Permissions */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">현재 권한</h3>
+              
+              {loadingPermissions ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  권한 정보를 불러오는 중...
+                </div>
+              ) : permissions.length === 0 ? (
+                <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/20">
+                  아직 추가된 권한이 없습니다
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {permissions.map((permission) => (
+                    <div key={permission.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-semibold text-primary">
+                            {permission.users?.name?.charAt(0) || '?'}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">{permission.users?.name || 'Unknown'}</div>
+                          <div className="text-xs text-muted-foreground">{permission.users?.email || 'No email'}</div>
+                        </div>
+                        <Badge variant={permission.role === 'moderator' ? 'default' : 'secondary'}>
+                          {permission.role === 'moderator' ? '관리자' : '조교'}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePermission(permission.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Role Descriptions */}
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/20">
+              <h4 className="text-sm font-medium">권한 설명</h4>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div><strong>조교:</strong> 출석 관리, 세션 정보 확인</div>
+                <div><strong>관리자:</strong> 조교 권한 + 세미나 수정, 신청자 승인/거부</div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -160,6 +160,7 @@ export async function PUT(
         location: body.location,
         description: body.description,
         duration_minutes: body.duration_minutes || 120,
+        external_url: body.external_url || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/spinner';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Calendar, Users, BookOpen, TrendingUp, Clock, Award, Bell, Loader2, Eye } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { DashboardStats, DashboardAnnouncement } from '@/types';
 
@@ -33,6 +34,8 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<DashboardAnnouncement[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(true);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<DashboardAnnouncement | null>(null);
+  const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
 
   useEffect(() => {
     const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -352,7 +355,11 @@ export default function DashboardPage() {
                   {announcements.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className="border border-border rounded-lg p-4 hover:bg-accent transition-colors"
+                      className="border border-border rounded-lg p-4 hover:bg-accent transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedAnnouncement(announcement);
+                        setAnnouncementDialogOpen(true);
+                      }}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -374,7 +381,6 @@ export default function DashboardPage() {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
                           <div className="flex items-center space-x-2 mt-2 text-xs text-muted-foreground">
                             <span>{announcement.time}</span>
                             {announcement.seminarTitle && (
@@ -390,6 +396,9 @@ export default function DashboardPage() {
                               </>
                             )}
                           </div>
+                        </div>
+                        <div className="flex-shrink-0 ml-2">
+                          <Eye className="w-4 h-4 text-muted-foreground" />
                         </div>
                       </div>
                     </div>
@@ -407,36 +416,72 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* 빠른 액션 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>빠른 액션</CardTitle>
-            <CardDescription>
-              자주 사용하는 기능들에 빠르게 접근하세요
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-16 flex-col space-y-2">
-                <BookOpen className="w-5 h-5" />
-                <span>세미나 둘러보기</span>
-              </Button>
-              <Button variant="outline" className="h-16 flex-col space-y-2">
-                <Users className="w-5 h-5" />
-                <span>내 신청 현황</span>
-              </Button>
-              <Button variant="outline" className="h-16 flex-col space-y-2">
-                <TrendingUp className="w-5 h-5" />
-                <span>출석 현황</span>
-              </Button>
-              <Button variant="outline" className="h-16 flex-col space-y-2">
-                <Bell className="w-5 h-5" />
-                <span>알림 설정</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
+
+      {/* Announcement Detail Dialog */}
+      <Dialog open={announcementDialogOpen} onOpenChange={setAnnouncementDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Bell className="w-5 h-5" />
+              <span>{selectedAnnouncement?.title}</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedAnnouncement && (
+            <div className="space-y-4">
+              {/* Badges */}
+              <div className="flex items-center space-x-2 flex-wrap">
+                {selectedAnnouncement.isPinned && (
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-200">
+                    고정
+                  </Badge>
+                )}
+                {selectedAnnouncement.isNew && (
+                  <Badge variant="secondary">
+                    NEW
+                  </Badge>
+                )}
+                {selectedAnnouncement.isGlobal && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-200">
+                    전체 공지
+                  </Badge>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="whitespace-pre-wrap text-foreground leading-relaxed">
+                  {selectedAnnouncement.content}
+                </div>
+              </div>
+
+              {/* Meta Information */}
+              <div className="border-t pt-4">
+                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{selectedAnnouncement.time}</span>
+                  </div>
+                  {selectedAnnouncement.authorName && (
+                    <div className="flex items-center space-x-1">
+                      <Users className="w-4 h-4" />
+                      <span>{selectedAnnouncement.authorName}</span>
+                    </div>
+                  )}
+                  {selectedAnnouncement.seminarTitle && (
+                    <div className="flex items-center space-x-1">
+                      <BookOpen className="w-4 h-4" />
+                      <span>{selectedAnnouncement.seminarTitle}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 } 

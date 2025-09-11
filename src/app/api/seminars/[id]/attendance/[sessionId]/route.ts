@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { sendAttendanceMarkedNotification } from '@/lib/notifications';
 
 export async function GET(
   request: NextRequest,
@@ -240,6 +241,42 @@ export async function POST(
     if (attendanceError) {
       console.error('Error updating attendance:', attendanceError);
       return NextResponse.json({ error: 'Failed to update attendance' }, { status: 500 });
+    }
+
+    // Send notification to the student (only if marked by instructor, not self-attendance)
+    if (userId !== user.id) {
+      try {
+        // Get session and seminar info for notification
+        const { data: sessionInfo } = await supabase
+          .from('sessions')
+          .select(`
+            title,
+            seminars (
+              title
+            )
+          `)
+          .eq('id', sessionId)
+          .single();
+
+        if (sessionInfo) {
+          // Handle seminars - it could be an array or single object
+          const seminar = Array.isArray(sessionInfo.seminars) 
+            ? sessionInfo.seminars[0] 
+            : sessionInfo.seminars;
+            
+          await sendAttendanceMarkedNotification(
+            userId,
+            sessionInfo.title || 'Session',
+            seminar?.title || 'Seminar',
+            status,
+            sessionId,
+            seminarId
+          );
+        }
+      } catch (notificationError) {
+        console.error('Failed to send attendance notification:', notificationError);
+        // Don't fail the attendance update if notification fails
+      }
     }
 
     return NextResponse.json(attendance);
