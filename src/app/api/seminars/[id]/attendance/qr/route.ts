@@ -87,7 +87,8 @@ export async function POST(
     // Create scannable URL for QR code
     const host = request.headers.get('host') || 'localhost:3000';
     const protocol = host.includes('localhost') ? 'http' : 'https';
-    const baseUrl = `${protocol}://${host}`;
+    // Use environment variable for production URL or fallback to host header
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const qrUrl = `${baseUrl}/attendance/scan?token=${qrCode}&session=${sessionId}&seminar=${seminarId}`;
 
     return NextResponse.json({
